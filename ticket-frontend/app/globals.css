@@ -1,0 +1,222 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-heading);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+}
+
+:root {
+  --radius: 0.875rem;
+  /* Attractive dark theme – rich violet primary, warm amber accent */
+  --background: oklch(0.13 0.032 275);
+  --foreground: oklch(0.97 0.01 275);
+  --card: oklch(0.18 0.035 275);
+  --card-foreground: oklch(0.97 0.01 275);
+  --popover: oklch(0.19 0.03 275);
+  --popover-foreground: oklch(0.97 0.01 275);
+  --primary: oklch(0.68 0.22 295);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.26 0.04 275);
+  --secondary-foreground: oklch(0.95 0 0);
+  --muted: oklch(0.26 0.03 275);
+  --muted-foreground: oklch(0.68 0.02 275);
+  --accent: oklch(0.72 0.16 55);
+  --accent-foreground: oklch(0.2 0.04 55);
+  --destructive: oklch(0.58 0.22 25);
+  --border: oklch(0.32 0.04 275);
+  --input: oklch(0.32 0.04 275);
+  --ring: oklch(0.68 0.22 295);
+  --chart-1: oklch(0.68 0.22 295);
+  --chart-2: oklch(0.72 0.16 55);
+  --chart-3: oklch(0.65 0.18 330);
+  --chart-4: oklch(0.7 0.14 185);
+  --chart-5: oklch(0.62 0.2 25);
+  --sidebar: oklch(0.15 0.03 275);
+  --sidebar-foreground: oklch(0.97 0 0);
+  --sidebar-primary: oklch(0.68 0.22 295);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(0.28 0.06 275);
+  --sidebar-accent-foreground: oklch(0.95 0 0);
+  --sidebar-border: oklch(0.32 0.04 275);
+  --sidebar-ring: oklch(0.68 0.22 295);
+}
+
+.light {
+  /* Light theme – warm cream base, violet & amber */
+  --background: oklch(0.985 0.008 85);
+  --foreground: oklch(0.22 0.03 275);
+  --card: oklch(1 0.004 85);
+  --card-foreground: oklch(0.22 0.03 275);
+  --popover: oklch(1 0.004 85);
+  --popover-foreground: oklch(0.22 0.03 275);
+  --primary: oklch(0.52 0.22 295);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.95 0.02 85);
+  --secondary-foreground: oklch(0.35 0.05 275);
+  --muted: oklch(0.95 0.015 85);
+  --muted-foreground: oklch(0.48 0.03 275);
+  --accent: oklch(0.75 0.15 55);
+  --accent-foreground: oklch(0.28 0.05 55);
+  --destructive: oklch(0.55 0.22 25);
+  --border: oklch(0.88 0.02 275);
+  --input: oklch(0.88 0.02 275);
+  --ring: oklch(0.52 0.22 295);
+  --chart-1: oklch(0.52 0.22 295);
+  --chart-2: oklch(0.75 0.15 55);
+  --chart-3: oklch(0.58 0.18 330);
+  --chart-4: oklch(0.6 0.14 185);
+  --chart-5: oklch(0.6 0.2 25);
+  --sidebar: oklch(0.98 0.01 85);
+  --sidebar-foreground: oklch(0.22 0.03 275);
+  --sidebar-primary: oklch(0.52 0.22 295);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(0.93 0.04 55);
+  --sidebar-accent-foreground: oklch(0.28 0.05 55);
+  --sidebar-border: oklch(0.88 0.02 275);
+  --sidebar-ring: oklch(0.52 0.22 295);
+}
+
+@layer base {
+  /* Custom scrollbar – thin, rounded, theme-aware (inside base so it applies in Chrome) */
+  *,
+  html,
+  body {
+    scrollbar-width: thin;
+    scrollbar-color: oklch(0.45 0.08 275) transparent;
+  }
+  *::-webkit-scrollbar,
+  html::-webkit-scrollbar,
+  body::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  *::-webkit-scrollbar-track,
+  html::-webkit-scrollbar-track,
+  body::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb,
+  html::-webkit-scrollbar-thumb,
+  body::-webkit-scrollbar-thumb {
+    background: oklch(0.45 0.08 275);
+    border-radius: 9999px;
+  }
+  *::-webkit-scrollbar-thumb:hover,
+  html::-webkit-scrollbar-thumb:hover,
+  body::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.55 0.12 295);
+  }
+  *::-webkit-scrollbar-thumb:active,
+  html::-webkit-scrollbar-thumb:active,
+  body::-webkit-scrollbar-thumb:active {
+    background: oklch(0.6 0.15 295);
+  }
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  .light *,
+  .light,
+  html.light,
+  body.light {
+    scrollbar-color: oklch(0.75 0.04 275) transparent;
+  }
+  .light *::-webkit-scrollbar-thumb,
+  html.light::-webkit-scrollbar-thumb,
+  body.light::-webkit-scrollbar-thumb {
+    background: oklch(0.75 0.04 275);
+  }
+  .light *::-webkit-scrollbar-thumb:hover,
+  html.light::-webkit-scrollbar-thumb:hover,
+  body.light::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.65 0.1 295);
+  }
+  .light *::-webkit-scrollbar-thumb:active,
+  html.light::-webkit-scrollbar-thumb:active,
+  body.light::-webkit-scrollbar-thumb:active {
+    background: oklch(0.55 0.14 295);
+  }
+
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-background text-foreground overflow-x-hidden;
+    background-image:
+      radial-gradient(ellipse 80% 50% at 50% -20%, oklch(0.68 0.22 295 / 0.12), transparent),
+      radial-gradient(ellipse 60% 40% at 100% 50%, oklch(0.72 0.16 55 / 0.06), transparent),
+      radial-gradient(ellipse 50% 30% at 0% 80%, oklch(0.68 0.22 295 / 0.08), transparent);
+  }
+  .light body {
+    background-image:
+      radial-gradient(ellipse 80% 50% at 50% -20%, oklch(0.52 0.22 295 / 0.08), transparent),
+      radial-gradient(ellipse 60% 40% at 100% 50%, oklch(0.75 0.15 55 / 0.06), transparent);
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading), var(--font-geist-sans), system-ui, sans-serif;
+  }
+}
+
+/* Utility for heading font */
+.font-heading {
+  font-family: var(--font-heading), var(--font-geist-sans), system-ui, sans-serif;
+}
+
+/* Attractive button glow on hover */
+.btn-glow {
+  box-shadow: 0 0 0 1px oklch(0.68 0.22 295 / 0.3), 0 4px 14px oklch(0.68 0.22 295 / 0.25);
+}
+.btn-glow:hover {
+  box-shadow: 0 0 0 1px oklch(0.68 0.22 295 / 0.4), 0 6px 20px oklch(0.68 0.22 295 / 0.35);
+}
+.light .btn-glow {
+  box-shadow: 0 0 0 1px oklch(0.52 0.22 295 / 0.2), 0 4px 14px oklch(0.52 0.22 295 / 0.15);
+}
+.light .btn-glow:hover {
+  box-shadow: 0 0 0 1px oklch(0.52 0.22 295 / 0.3), 0 6px 20px oklch(0.52 0.22 295 / 0.25);
+}
