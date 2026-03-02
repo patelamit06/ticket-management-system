@@ -9,9 +9,11 @@ import { SiteFooter } from '@/components/site-footer';
 import { getPublicEvent } from '@/lib/events-api';
 import { getPublicTicketTypes } from '@/lib/ticket-types-api';
 import { getPublicEventDiscounts } from '@/lib/event-discounts-api';
+import { getPublicEventMedia } from '@/lib/event-media-api';
 import type { EventPayload } from '@/lib/events-api';
 import type { TicketTypePayload } from '@/lib/ticket-types-api';
 import type { EventDiscountPayload } from '@/lib/event-discounts-api';
+import type { EventMediaPayload } from '@/lib/event-media-api';
 
 function formatDateRange(start: string, end: string, timezone?: string | null): string {
   const startDate = new Date(start);
@@ -56,6 +58,8 @@ export default function PublicEventPage() {
   const [event, setEvent] = React.useState<EventPayload | null>(null);
   const [ticketTypes, setTicketTypes] = React.useState<TicketTypePayload[]>([]);
   const [discounts, setDiscounts] = React.useState<EventDiscountPayload[]>([]);
+  const [media, setMedia] = React.useState<EventMediaPayload[]>([]);
+  const [carouselIndex, setCarouselIndex] = React.useState(0);
   const [loading, setLoading] = React.useState(true);
   const [notFound, setNotFound] = React.useState(false);
   const [descriptionExpanded, setDescriptionExpanded] = React.useState(false);
@@ -76,13 +80,15 @@ export default function PublicEventPage() {
         return Promise.all([
           getPublicTicketTypes(eventId),
           getPublicEventDiscounts(eventId).catch(() => []),
+          getPublicEventMedia(eventId).catch(() => []),
         ]);
       })
       .then((result) => {
         if (result) {
-          const [types, disc] = result;
+          const [types, disc, med] = result;
           setTicketTypes(types);
           setDiscounts(disc);
+          setMedia(med);
         }
       })
       .catch(() => setNotFound(true))
@@ -149,14 +155,73 @@ export default function PublicEventPage() {
               </button>
             </div>
 
-            {/* Hero: banner + title + by + location + date */}
-            {event.bannerUrl && (
+            {/* Hero: carousel (if media) or banner + title + by + location + date */}
+            {media.length > 0 ? (
+              <div className="relative mt-6 overflow-hidden rounded-xl bg-muted shadow-sm">
+                <div className="relative aspect-video w-full">
+                  {media.map((m, i) => (
+                    <div
+                      key={m.id}
+                      className={`absolute inset-0 transition-opacity duration-300 ${i === carouselIndex ? 'z-10 opacity-100' : 'z-0 opacity-0'}`}
+                      aria-hidden={i !== carouselIndex}
+                    >
+                      {m.type === 'image' ? (
+                        <img
+                          src={m.url}
+                          alt={m.caption ?? ''}
+                          className="h-full w-full object-contain"
+                        />
+                      ) : (
+                        <iframe
+                          src={m.url}
+                          title={m.caption ?? 'Video'}
+                          className="h-full w-full"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {media.length > 1 && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setCarouselIndex((i) => (i === 0 ? media.length - 1 : i - 1))}
+                      className="absolute left-2 top-1/2 z-20 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white hover:bg-black/70 focus:outline-none focus:ring-2 focus:ring-primary"
+                      aria-label="Previous"
+                    >
+                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCarouselIndex((i) => (i === media.length - 1 ? 0 : i + 1))}
+                      className="absolute right-2 top-1/2 z-20 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white hover:bg-black/70 focus:outline-none focus:ring-2 focus:ring-primary"
+                      aria-label="Next"
+                    >
+                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                    </button>
+                    <div className="absolute bottom-2 left-0 right-0 z-20 flex justify-center gap-1.5">
+                      {media.map((_, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => setCarouselIndex(i)}
+                          className={`h-2 rounded-full transition-colors ${i === carouselIndex ? 'w-6 bg-white' : 'w-2 bg-white/50 hover:bg-white/70'}`}
+                          aria-label={`Slide ${i + 1}`}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            ) : event.bannerUrl ? (
               <img
                 src={event.bannerUrl}
                 alt=""
                 className="mt-6 aspect-video w-full rounded-xl object-cover shadow-sm"
               />
-            )}
+            ) : null}
             <h1 className="mt-6 font-heading text-2xl font-bold tracking-tight text-foreground sm:text-3xl md:text-4xl">
               {event.name}
             </h1>

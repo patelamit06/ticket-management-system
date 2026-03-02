@@ -8,6 +8,8 @@ import { UsersModule } from './users/users.module';
 import { EventsModule } from './events/events.module';
 import { TicketTypesModule } from './ticket-types/ticket-types.module';
 import { EventDiscountsModule } from './event-discounts/event-discounts.module';
+import { EventMediaModule } from './event-media/event-media.module';
+import { MinioModule } from './minio/minio.module';
 import { OrdersModule } from './orders/orders.module';
 import { PaymentsModule } from './payments/payments.module';
 import { TicketsModule } from './tickets/tickets.module';
@@ -26,6 +28,8 @@ import { CountriesModule } from './countries/countries.module';
     EventsModule,
     TicketTypesModule,
     EventDiscountsModule,
+    EventMediaModule,
+    MinioModule,
     OrdersModule,
     PaymentsModule,
     TicketsModule,

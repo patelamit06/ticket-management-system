@@ -66,8 +66,26 @@ model Event {
   organizer    User           @relation(fields: [organizerId], references: [id], onDelete: Cascade)
   ticketTypes  TicketType[]
   discounts    EventDiscount[]
+  media        EventMedia[]
 
   @@map("events")
+  @@schema("ticket_db")
+}
+
+/// Event media for carousel: images (stored in MinIO) or video links (e.g. YouTube).
+model EventMedia {
+  id        String   @id @default(cuid())
+  eventId   String   @map("event_id")
+  type      String   // image | video
+  url       String   // MinIO object URL for image; embed or watch URL for video
+  caption   String?  @db.VarChar(500)
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@map("event_media")
   @@schema("ticket_db")
 }
 

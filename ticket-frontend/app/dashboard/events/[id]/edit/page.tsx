@@ -30,6 +30,13 @@ import {
   type EventDiscountPayload,
   type CreateEventDiscountBody,
 } from '@/lib/event-discounts-api';
+import {
+  getEventMedia,
+  uploadEventMedia,
+  addEventMediaVideo,
+  deleteEventMedia,
+  type EventMediaPayload,
+} from '@/lib/event-media-api';
 
 const eventSchema = z.object({
   name: z.string().min(1).max(300),
@@ -76,6 +83,11 @@ export default function EditEventPage() {
   const [saving, setSaving] = React.useState(false);
   const [addingTicket, setAddingTicket] = React.useState(false);
   const [addingDiscount, setAddingDiscount] = React.useState(false);
+  const [media, setMedia] = React.useState<EventMediaPayload[]>([]);
+  const [addingVideo, setAddingVideo] = React.useState(false);
+  const [videoUrl, setVideoUrl] = React.useState('');
+  const [uploadingMedia, setUploadingMedia] = React.useState(false);
+  const [imgLoadErrors, setImgLoadErrors] = React.useState<Set<string>>(new Set());
   const [error, setError] = React.useState<string | null>(null);
 
   const eventForm = useForm<EventForm>({
@@ -153,6 +165,7 @@ export default function EditEventPage() {
     if (!eventId) return;
     getTicketTypes(eventId).then(setTicketTypes).catch(() => setTicketTypes([]));
     getEventDiscounts(eventId).then(setDiscounts).catch(() => setDiscounts([]));
+    getEventMedia(eventId).then(setMedia).catch(() => setMedia([]));
   }, [eventId]);
 
   const onEventSubmit = eventForm.handleSubmit(async (data) => {
@@ -245,6 +258,48 @@ export default function EditEventPage() {
       setDiscounts((prev) => prev.filter((d) => d.id !== discountId));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to remove');
+    }
+  };
+
+  const handleUploadImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!eventId || !e.target.files?.[0]) return;
+    setError(null);
+    setUploadingMedia(true);
+    try {
+      const created = await uploadEventMedia(eventId, e.target.files[0]);
+      setMedia((prev) => [...prev, created]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setUploadingMedia(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleAddVideo = async () => {
+    if (!eventId || !videoUrl.trim()) return;
+    setError(null);
+    setSaving(true);
+    try {
+      const created = await addEventMediaVideo(eventId, { type: 'video', url: videoUrl.trim() });
+      setMedia((prev) => [...prev, created]);
+      setVideoUrl('');
+      setAddingVideo(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to add video');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRemoveMedia = async (mediaId: string) => {
+    if (!eventId) return;
+    setError(null);
+    try {
+      await deleteEventMedia(eventId, mediaId);
+      setMedia((prev) => prev.filter((m) => m.id !== mediaId));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to remove');
     }
   };
 
@@ -458,6 +513,70 @@ export default function EditEventPage() {
                   </div>
                 </form>
               )}
+            </section>
+
+            <section className="mt-8 rounded-xl border border-border bg-card p-6">
+              <h2 className="font-heading text-lg font-semibold text-foreground">Photos & videos</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Images and video links shown in a carousel on the event page.
+              </p>
+              {media.some((m) => m.type === 'image') && media.some((m) => m.type === 'image' && imgLoadErrors.has(m.id)) && (
+                <p className="mt-2 text-xs text-amber-600 dark:text-amber-500">
+                  Some thumbnails could not load. If images are missing, set the MinIO bucket &quot;events&quot; to public read (Console → http://localhost:9001).
+                </p>
+              )}
+              <ul className="mt-4 space-y-3">
+                {media.map((m) => (
+                  <li key={m.id} className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3">
+                    {m.type === 'image' ? (
+                      imgLoadErrors.has(m.id) ? (
+                        <span className="flex h-12 w-16 items-center justify-center rounded bg-muted text-xs text-muted-foreground">Image</span>
+                      ) : (
+                        <img
+                          src={m.url}
+                          alt={m.caption ?? ''}
+                          className="h-12 w-16 rounded object-cover bg-muted"
+                          referrerPolicy="no-referrer"
+                          onError={() => setImgLoadErrors((prev) => new Set(prev).add(m.id))}
+                        />
+                      )
+                    ) : (
+                      <span className="flex h-12 w-16 items-center justify-center rounded bg-muted text-xs text-muted-foreground">Video</span>
+                    )}
+                    <span className="flex-1 truncate text-sm text-muted-foreground">
+                      {m.type === 'image' ? 'Image' : 'Video'}
+                      {m.caption ? ` · ${m.caption}` : ''}
+                    </span>
+                    <button type="button" onClick={() => handleRemoveMedia(m.id)} className="text-sm text-destructive hover:underline">Remove</button>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <label className="cursor-pointer rounded-lg border border-dashed border-border px-4 py-3 text-sm font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground">
+                  <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" className="sr-only" onChange={handleUploadImage} disabled={uploadingMedia} />
+                  {uploadingMedia ? 'Uploading…' : '+ Upload image'}
+                </label>
+                {!addingVideo ? (
+                  <button type="button" onClick={() => setAddingVideo(true)} className="rounded-lg border border-dashed border-border px-4 py-3 text-sm font-medium text-muted-foreground hover:bg-muted/50">
+                    + Add video link
+                  </button>
+                ) : (
+                  <div className="flex flex-1 flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/20 p-3">
+                    <input
+                      type="url"
+                      placeholder="YouTube or video URL"
+                      className={inputClass}
+                      value={videoUrl}
+                      onChange={(e) => setVideoUrl(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddVideo())}
+                    />
+                    <button type="button" onClick={handleAddVideo} disabled={saving || !videoUrl.trim()} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+                      {saving ? 'Adding…' : 'Add'}
+                    </button>
+                    <button type="button" onClick={() => { setAddingVideo(false); setVideoUrl(''); }} className="rounded-lg border border-border px-4 py-2 text-sm hover:bg-muted/50">Cancel</button>
+                  </div>
+                )}
+              </div>
             </section>
           </>
         )}
