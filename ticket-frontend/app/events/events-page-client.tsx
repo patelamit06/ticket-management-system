@@ -30,7 +30,7 @@ export function EventsPageClient({
   React.useEffect(() => {
     setLoading(true);
     getPublicEvents({
-      country: country ?? undefined,
+      country: country && country !== 'All' ? country : undefined,
       city: city ? decodeURIComponent(city.replace(/-/g, ' ')) : undefined,
       limit: 50,
     })

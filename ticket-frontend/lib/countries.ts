@@ -14,11 +14,13 @@ export const DEFAULT_COUNTRY_CODE = 'US';
 
 /** Fallback when browse API is unavailable. */
 export const FALLBACK_BROWSE_COUNTRIES: BrowseCountry[] = [
-  { code: 'US', label: 'United States' },
-  { code: 'GB', label: 'United Kingdom' },
-  { code: 'IN', label: 'India' },
+  { code: 'All', label: 'All' },
   { code: 'AU', label: 'Australia' },
   { code: 'CA', label: 'Canada' },
+  { code: 'IN', label: 'India' },
+  { code: 'SE', label: 'Sweden' },
+  { code: 'US', label: 'United States' },
+  { code: 'GB', label: 'United Kingdom' },
 ];
 
 /** Fetch countries for browse/locale (ISO codes) from backend. */
