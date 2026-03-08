@@ -335,10 +335,10 @@ export default function PublicEventPage() {
               </section>
             )}
 
-            {/* Get tickets + ticket types */}
+            {/* ticket types */}
             <section className="mt-8 rounded-xl border-2 border-primary/20 bg-card p-6 shadow-sm" aria-labelledby="tickets-heading">
               <h2 id="tickets-heading" className="font-heading text-lg font-semibold text-foreground">
-                Get tickets
+                Ticket types: <span className="font-normal text-muted-foreground">Define types of tickets available for this event, such as General Admission, VIP, Early Bird, etc. Each ticket type can have its own price, quantity, and optional age restrictions.</span>
               </h2>
               {ticketTypes.length === 0 ? (
                 <p className="mt-3 text-sm text-muted-foreground">
