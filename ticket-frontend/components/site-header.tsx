@@ -75,7 +75,7 @@ export function SiteHeader() {
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
               <User className="h-4 w-4" aria-hidden />
             </span>
-            <span className="max-w-[120px] truncate hidden sm:inline">{user.email}</span>
+            <span className="max-w-[120px] truncate hidden sm:inline">{user.name?.trim() || user.email}</span>
             <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${profileOpen ? 'rotate-180' : ''}`} aria-hidden />
           </button>
           {profileOpen && (
@@ -85,7 +85,8 @@ export function SiteHeader() {
             >
               <div className="px-3 py-2 border-b border-border/60">
                 <p className="text-xs text-muted-foreground">Signed in as</p>
-                <p className="truncate text-sm font-medium text-foreground" title={user.email}>{user.email}</p>
+                <p className="truncate text-sm font-medium text-foreground" title={user.email}>{user.name?.trim() || user.email}</p>
+                {user.name?.trim() && <p className="truncate text-xs text-muted-foreground" title={user.email}>{user.email}</p>}
               </div>
               <Link
                 href="/dashboard"
@@ -95,6 +96,14 @@ export function SiteHeader() {
               >
                 <LayoutDashboard className="h-4 w-4 shrink-0" />
                 Dashboard
+              </Link>
+              <Link
+                href="/orders"
+                role="menuitem"
+                onClick={() => setProfileOpen(false)}
+                className="flex items-center gap-2 px-3 py-2.5 text-sm text-foreground hover:bg-accent hover:text-accent-foreground"
+              >
+                My orders
               </Link>
               <button
                 type="button"
@@ -140,10 +149,13 @@ export function SiteHeader() {
               <>
                 <div className="flex items-center gap-2 px-4 py-2 border-b border-border/60">
                   <User className="h-5 w-5 shrink-0 text-primary" />
-                  <span className="text-sm text-muted-foreground truncate">{user.email}</span>
+                  <span className="text-sm text-muted-foreground truncate">{user.name?.trim() || user.email}</span>
                 </div>
                 <Link href="/dashboard" className={navLink} onClick={() => setMobileOpen(false)}>
                   Dashboard
+                </Link>
+                <Link href="/orders" className={navLink} onClick={() => setMobileOpen(false)}>
+                  My orders
                 </Link>
                 <button type="button" onClick={handleLogout} className={`${navLink} w-full text-left`}>
                   Log out

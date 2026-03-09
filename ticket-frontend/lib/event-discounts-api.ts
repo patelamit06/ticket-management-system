@@ -6,6 +6,7 @@ export interface EventDiscountPayload {
   name: string;
   type: string;
   discountPercent: number;
+  isActive: boolean;
   validTo: string | null;
   minQuantity: number | null;
   ticketTypeIds: string[] | null;
@@ -18,6 +19,7 @@ export interface CreateEventDiscountBody {
   name: string;
   type: 'early_bird' | 'group';
   discountPercent: number;
+  isActive?: boolean;
   validTo?: string;
   minQuantity?: number;
   ticketTypeIds?: string[];
@@ -28,6 +30,7 @@ export interface UpdateEventDiscountBody {
   name?: string;
   type?: 'early_bird' | 'group';
   discountPercent?: number;
+  isActive?: boolean;
   validTo?: string;
   minQuantity?: number;
   ticketTypeIds?: string[];

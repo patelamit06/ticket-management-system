@@ -7,6 +7,16 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
 
+/** Public event list/detail can include media (images/videos) */
+export interface EventMediaItem {
+  id: string;
+  eventId: string;
+  type: string;
+  url: string;
+  caption: string | null;
+  sortOrder: number;
+}
+
 export interface EventPayload {
   id: string;
   name: string;
@@ -24,6 +34,14 @@ export interface EventPayload {
   groupDiscountTiers: unknown;
   createdAt: Date;
   updatedAt: Date;
+  /** Included in public list/detail: images and video URLs */
+  media?: EventMediaItem[];
+}
+
+/** Use localhost in media URLs so browser and resource match (avoids CORS/provisional headers). */
+function urlForBrowser(url: string): string {
+  if (typeof url !== 'string') return url;
+  return url.replace(/^http:\/\/127\.0\.0\.1:9000\//, 'http://localhost:9000/');
 }
 
 function toEventPayload(row: {
@@ -42,8 +60,8 @@ function toEventPayload(row: {
   groupDiscountTiers: unknown;
   createdAt: Date;
   updatedAt: Date;
-}): EventPayload {
-  return {
+}, media?: EventMediaItem[]): EventPayload {
+  const payload: EventPayload = {
     id: row.id,
     name: row.name,
     description: row.description,
@@ -60,6 +78,8 @@ function toEventPayload(row: {
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
+  if (media && media.length > 0) payload.media = media;
+  return payload;
 }
 
 @Injectable()
@@ -89,8 +109,21 @@ export class EventsService {
     const list = await this.prisma.event.findMany({
       where: { organizerId: userId },
       orderBy: { startDate: 'asc' },
+      include: {
+        media: { orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }] },
+      },
     });
-    return list.map(toEventPayload);
+    return list.map((ev) => {
+      const media: EventMediaItem[] = (ev as { media?: { id: string; eventId: string; type: string; url: string; caption: string | null; sortOrder: number }[] }).media?.map((m) => ({
+        id: m.id,
+        eventId: m.eventId,
+        type: m.type,
+        url: urlForBrowser(m.url),
+        caption: m.caption,
+        sortOrder: m.sortOrder,
+      })) ?? [];
+      return toEventPayload(ev, media);
+    });
   }
 
   async findOneForOrganizer(
@@ -178,27 +211,51 @@ export class EventsService {
         orderBy: { startDate: 'asc' },
         take: params.limit ?? 50,
         skip: params.offset ?? 0,
-        include: { organizer: { select: { name: true } } },
+        include: {
+          organizer: { select: { name: true } },
+          media: { orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }] },
+        },
       }),
       this.prisma.event.count({ where }),
     ]);
     return {
-      events: events.map((ev) => ({
-        ...toEventPayload(ev),
-        organizerName: ev.organizer?.name ?? null,
-      })),
+      events: events.map((ev) => {
+        const media: EventMediaItem[] = (ev as { media?: { id: string; eventId: string; type: string; url: string; caption: string | null; sortOrder: number }[] }).media?.map((m) => ({
+          id: m.id,
+          eventId: m.eventId,
+          type: m.type,
+          url: urlForBrowser(m.url),
+          caption: m.caption,
+          sortOrder: m.sortOrder,
+        })) ?? [];
+        return {
+          ...toEventPayload(ev, media),
+          organizerName: ev.organizer?.name ?? null,
+        };
+      }),
       total,
     };
   }
 
-  /** Public: get single published event by id (includes organizer name) */
+  /** Public: get single published event by id (includes organizer name and media) */
   async findOnePublic(eventId: string): Promise<EventPayload | null> {
     const event = await this.prisma.event.findFirst({
       where: { id: eventId, status: 'published' },
-      include: { organizer: { select: { name: true } } },
+      include: {
+        organizer: { select: { name: true } },
+        media: { orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }] },
+      },
     });
     if (!event) return null;
-    const payload = toEventPayload(event);
+    const media: EventMediaItem[] = (event as { media?: { id: string; eventId: string; type: string; url: string; caption: string | null; sortOrder: number }[] }).media?.map((m) => ({
+      id: m.id,
+      eventId: m.eventId,
+      type: m.type,
+      url: urlForBrowser(m.url),
+      caption: m.caption,
+      sortOrder: m.sortOrder,
+    })) ?? [];
+    const payload = toEventPayload(event, media);
     return { ...payload, organizerName: event.organizer?.name ?? null };
   }
 }

@@ -7,6 +7,7 @@ export interface TicketTypePayload {
   price: number;
   quantity: number;
   maxPerOrder: number;
+  isActive: boolean;
   availabilityStart: string | null;
   availabilityEnd: string | null;
   ageMin: number | null;
@@ -21,6 +22,7 @@ export interface CreateTicketTypeBody {
   price: number;
   quantity?: number;
   maxPerOrder?: number;
+  isActive?: boolean;
   availabilityStart?: string;
   availabilityEnd?: string;
   ageMin?: number;
@@ -33,6 +35,7 @@ export interface UpdateTicketTypeBody {
   price?: number;
   quantity?: number;
   maxPerOrder?: number;
+  isActive?: boolean;
   availabilityStart?: string;
   availabilityEnd?: string;
   ageMin?: number;

@@ -177,6 +177,7 @@ export default function NewEventPage() {
         price: data.price,
         quantity: data.quantity ?? 0,
         maxPerOrder: data.maxPerOrder ?? 10,
+        isActive: true,
         ageMin: data.ageMin,
         ageMax: data.ageMax,
       };
@@ -218,6 +219,7 @@ export default function NewEventPage() {
         name: data.name,
         type: data.type as 'early_bird' | 'group',
         discountPercent: data.discountPercent,
+        isActive: true,
         validTo: data.validTo || undefined,
         minQuantity: data.minQuantity,
       };
@@ -493,9 +495,12 @@ export default function NewEventPage() {
                     key={tt.id}
                     className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-4 py-3"
                   >
-                    <div>
+                    <div className="flex items-center gap-2">
                       <span className="font-medium text-foreground">{tt.name}</span>
-                      <span className="ml-2 text-sm text-muted-foreground">
+                      <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${tt.isActive !== false ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' : 'bg-muted text-muted-foreground'}`}>
+                        {tt.isActive !== false ? 'Active' : 'Inactive'}
+                      </span>
+                      <span className="text-sm text-muted-foreground">
                         {tt.price === 0 ? 'Free' : `$${tt.price.toFixed(2)}`}
                         {tt.ageMin != null || tt.ageMax != null
                           ? ` · Age ${tt.ageMin ?? '?'}-${tt.ageMax ?? '?'}`
@@ -578,9 +583,12 @@ export default function NewEventPage() {
               <ul className="mt-4 space-y-3">
                 {discounts.map((d) => (
                   <li key={d.id} className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-4 py-3">
-                    <div>
+                    <div className="flex items-center gap-2">
                       <span className="font-medium text-foreground">{d.name}</span>
-                      <span className="ml-2 text-sm text-muted-foreground">
+                      <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${d.isActive !== false ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' : 'bg-muted text-muted-foreground'}`}>
+                        {d.isActive !== false ? 'Active' : 'Inactive'}
+                      </span>
+                      <span className="text-sm text-muted-foreground">
                         {d.discountPercent}% off
                         {d.type === 'early_bird' && d.validTo && ` · Until ${new Date(d.validTo).toLocaleDateString()}`}
                         {d.type === 'group' && d.minQuantity != null && ` · ${d.minQuantity}+ tickets`}

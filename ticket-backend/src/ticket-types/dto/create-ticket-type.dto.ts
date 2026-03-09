@@ -4,6 +4,7 @@ import {
   IsOptional,
   IsInt,
   IsNumber,
+  IsBoolean,
   Min,
   Max,
   IsDateString,
@@ -61,6 +62,12 @@ export class CreateTicketTypeDto {
   @Max(120)
   @Type(() => Number)
   ageMax?: number;
+
+  @ApiPropertyOptional({ example: true, description: 'Active ticket types are shown and sellable' })
+  @IsOptional()
+  @IsBoolean()
+  @Type(() => Boolean)
+  isActive?: boolean;
 
   @ApiPropertyOptional({ example: 0 })
   @IsOptional()

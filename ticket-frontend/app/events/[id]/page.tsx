@@ -2,8 +2,8 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
-import { MapPin, Calendar, Clock, User, Share2 } from 'lucide-react';
+import { useParams, useRouter } from 'next/navigation';
+import { MapPin, Calendar, Clock, Share2, Minus, Plus } from 'lucide-react';
 import { SiteHeader } from '@/components/site-header';
 import { SiteFooter } from '@/components/site-footer';
 import { getPublicEvent } from '@/lib/events-api';
@@ -14,6 +14,14 @@ import type { EventPayload } from '@/lib/events-api';
 import type { TicketTypePayload } from '@/lib/ticket-types-api';
 import type { EventDiscountPayload } from '@/lib/event-discounts-api';
 import type { EventMediaPayload } from '@/lib/event-media-api';
+
+/** Ensure video URL is in embed form for iframe (YouTube watch → embed). */
+function toEmbedVideoUrl(url: string): string {
+  const trimmed = url.trim();
+  const ytMatch = trimmed.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/);
+  if (ytMatch) return `https://www.youtube.com/embed/${ytMatch[1]}`;
+  return trimmed;
+}
 
 function formatDateRange(start: string, end: string, timezone?: string | null): string {
   const startDate = new Date(start);
@@ -64,6 +72,22 @@ export default function PublicEventPage() {
   const [notFound, setNotFound] = React.useState(false);
   const [descriptionExpanded, setDescriptionExpanded] = React.useState(false);
   const descriptionLength = 320;
+  const [quantities, setQuantities] = React.useState<Record<string, number>>({});
+  const router = useRouter();
+
+  const setQuantity = React.useCallback((ticketTypeId: string, delta: number) => {
+    setQuantities((prev) => {
+      const next = { ...prev };
+      const current = next[ticketTypeId] ?? 0;
+      const nextVal = Math.max(0, current + delta);
+      if (nextVal === 0) delete next[ticketTypeId];
+      else next[ticketTypeId] = nextVal;
+      return next;
+    });
+  }, []);
+
+  const totalTickets = Object.values(quantities).reduce((a, b) => a + b, 0);
+  const canCheckout = totalTickets > 0 && eventId && event;
 
   React.useEffect(() => {
     if (!eventId) return;
@@ -158,30 +182,27 @@ export default function PublicEventPage() {
             {/* Hero: carousel (if media) or banner + title + by + location + date */}
             {media.length > 0 ? (
               <div className="relative mt-6 overflow-hidden rounded-xl bg-muted shadow-sm">
-                <div className="relative aspect-video w-full">
-                  {media.map((m, i) => (
-                    <div
-                      key={m.id}
-                      className={`absolute inset-0 transition-opacity duration-300 ${i === carouselIndex ? 'z-10 opacity-100' : 'z-0 opacity-0'}`}
-                      aria-hidden={i !== carouselIndex}
-                    >
-                      {m.type === 'image' ? (
-                        <img
-                          src={m.url}
-                          alt={m.caption ?? ''}
-                          className="h-full w-full object-contain"
-                        />
-                      ) : (
-                        <iframe
-                          src={m.url}
-                          title={m.caption ?? 'Video'}
-                          className="h-full w-full"
-                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                          allowFullScreen
-                        />
-                      )}
-                    </div>
-                  ))}
+                <div className="relative w-full bg-black/5" style={{ aspectRatio: '16/9' }}>
+                  {(() => {
+                    const m = media[carouselIndex];
+                    if (!m) return null;
+                    return m.type === 'image' ? (
+                      <img
+                        src={m.url}
+                        alt={m.caption ?? ''}
+                        className="h-full w-full object-contain"
+                      />
+                    ) : (
+                      <iframe
+                        src={toEmbedVideoUrl(m.url)}
+                        title={m.caption ?? 'Video'}
+                        className="absolute inset-0 h-full w-full border-0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                        loading="eager"
+                      />
+                    );
+                  })()}
                 </div>
                 {media.length > 1 && (
                   <>
@@ -346,24 +367,50 @@ export default function PublicEventPage() {
                 </p>
               ) : (
                 <ul className="mt-4 space-y-3">
-                  {ticketTypes.map((tt) => (
-                    <li
-                      key={tt.id}
-                      className="flex flex-col gap-1 rounded-lg border border-border bg-muted/20 px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
-                    >
-                      <div>
-                        <span className="font-medium text-foreground">{tt.name}</span>
-                        {(tt.ageMin != null || tt.ageMax != null) && (
-                          <span className="ml-2 text-sm text-muted-foreground">
-                            (Age {tt.ageMin ?? '?'}–{tt.ageMax ?? '?'})
+                  {ticketTypes.map((tt) => {
+                    const qty = quantities[tt.id] ?? 0;
+                    return (
+                      <li
+                        key={tt.id}
+                        className="flex flex-col gap-3 rounded-lg border border-border bg-muted/20 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+                      >
+                        <div className="flex-1">
+                          <span className="font-medium text-foreground">{tt.name}</span>
+                          {(tt.ageMin != null || tt.ageMax != null) && (
+                            <span className="ml-2 text-sm text-muted-foreground">
+                              (Age {tt.ageMin ?? '?'}–{tt.ageMax ?? '?'})
+                            </span>
+                          )}
+                          <p className="mt-0.5 text-sm text-muted-foreground">
+                            {tt.price === 0 ? 'Free' : `$${tt.price.toFixed(2)}`} each · max {tt.maxPerOrder} per order
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setQuantity(tt.id, -1)}
+                            disabled={qty === 0}
+                            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-background text-foreground hover:bg-muted disabled:opacity-50"
+                            aria-label={`Remove one ${tt.name}`}
+                          >
+                            <Minus className="h-4 w-4" />
+                          </button>
+                          <span className="min-w-[2rem] text-center font-medium tabular-nums" aria-live="polite">
+                            {qty}
                           </span>
-                        )}
-                      </div>
-                      <span className="font-semibold text-foreground">
-                        {tt.price === 0 ? 'Free' : `$${tt.price.toFixed(2)}`}
-                      </span>
-                    </li>
-                  ))}
+                          <button
+                            type="button"
+                            onClick={() => setQuantity(tt.id, 1)}
+                            disabled={qty >= tt.maxPerOrder}
+                            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-background text-foreground hover:bg-muted disabled:opacity-50"
+                            aria-label={`Add one ${tt.name}`}
+                          >
+                            <Plus className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
               {discounts.length > 0 && (
@@ -380,9 +427,36 @@ export default function PublicEventPage() {
                   </ul>
                 </div>
               )}
-              <p className="mt-4 text-sm text-muted-foreground">
-                Checkout will be available in a future update.
-              </p>
+              {ticketTypes.length > 0 && (
+                <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    {totalTickets === 0
+                      ? 'Select quantities above to continue.'
+                      : `${totalTickets} ticket${totalTickets !== 1 ? 's' : ''} selected`}
+                  </p>
+                  <button
+                    type="button"
+                    disabled={!canCheckout}
+                    onClick={() => {
+                      if (!eventId || !event) return;
+                      const items = Object.entries(quantities)
+                        .filter(([, n]) => n > 0)
+                        .map(([ticketTypeId, quantity]) => {
+                          const tt = ticketTypes.find((t) => t.id === ticketTypeId)!;
+                          return { ticketTypeId, quantity, name: tt.name, price: tt.price };
+                        });
+                      sessionStorage.setItem(
+                        `cart_${eventId}`,
+                        JSON.stringify({ eventId, eventName: event.name, items })
+                      );
+                      router.push(`/events/${eventId}/checkout`);
+                    }}
+                    className="rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
+                  >
+                    Checkout
+                  </button>
+                </div>
+              )}
             </section>
 
             {/* Related */}

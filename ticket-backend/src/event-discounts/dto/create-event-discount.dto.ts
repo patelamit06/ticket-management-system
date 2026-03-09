@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsOptional, IsInt, IsNumber, Min, Max, IsDateString, IsIn, IsArray } from 'class-validator';
+import { IsString, IsOptional, IsInt, IsNumber, IsBoolean, Min, Max, IsDateString, IsIn, IsArray } from 'class-validator';
 import { Type } from 'class-transformer';
 
 const TYPES = ['early_bird', 'group'] as const;
@@ -37,6 +37,12 @@ export class CreateEventDiscountDto {
   @IsArray()
   @IsString({ each: true })
   ticketTypeIds?: string[];
+
+  @ApiPropertyOptional({ example: true, description: 'Active discounts are shown and applicable' })
+  @IsOptional()
+  @IsBoolean()
+  @Type(() => Boolean)
+  isActive?: boolean;
 
   @ApiPropertyOptional()
   @IsOptional()

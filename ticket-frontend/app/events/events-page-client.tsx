@@ -6,6 +6,7 @@ import { CalendarDays } from 'lucide-react';
 import { useLocale } from '@/contexts/locale-context';
 import { getCountryLabel } from '@/lib/countries';
 import { getPublicEvents, type EventPayload } from '@/lib/events-api';
+import { EventCard } from '@/components/event-card';
 
 type SearchParams = { country?: string; city?: string };
 
@@ -57,38 +58,7 @@ export function EventsPageClient({
         <ul className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {events.map((ev) => (
             <li key={ev.id}>
-              <Link
-                href={`/events/${ev.id}`}
-                className="block rounded-xl border border-border bg-card p-5 shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
-              >
-                {ev.bannerUrl && (
-                  <img
-                    src={ev.bannerUrl}
-                    alt=""
-                    className="mb-3 h-40 w-full rounded-lg object-cover"
-                  />
-                )}
-                <h2 className="font-heading font-semibold text-foreground line-clamp-2">
-                  {ev.name}
-                </h2>
-                {ev.organizerName && (
-                  <p className="mt-1 text-sm text-muted-foreground">By {ev.organizerName}</p>
-                )}
-                {ev.location && (
-                  <p className="mt-0.5 text-sm text-muted-foreground line-clamp-1">
-                    {ev.location}
-                    {ev.city ? `, ${ev.city}` : ''}
-                  </p>
-                )}
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {new Date(ev.startDate).toLocaleDateString(undefined, {
-                    weekday: 'short',
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric',
-                  })}
-                </p>
-              </Link>
+              <EventCard ev={ev} href={`/events/${ev.id}`} variant="public" />
             </li>
           ))}
         </ul>

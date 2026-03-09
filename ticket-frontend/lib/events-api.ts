@@ -1,5 +1,14 @@
 import { apiWithAuth } from './auth';
 
+export interface EventMediaItem {
+  id: string;
+  eventId: string;
+  type: string;
+  url: string;
+  caption: string | null;
+  sortOrder: number;
+}
+
 export interface EventPayload {
   id: string;
   name: string;
@@ -17,6 +26,8 @@ export interface EventPayload {
   groupDiscountTiers: unknown;
   createdAt: string;
   updatedAt: string;
+  /** Public list/detail: images and video URLs */
+  media?: EventMediaItem[];
 }
 
 export interface CreateEventBody {

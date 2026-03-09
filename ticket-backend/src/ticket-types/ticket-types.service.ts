@@ -14,6 +14,7 @@ export interface TicketTypePayload {
   price: number;
   quantity: number;
   maxPerOrder: number;
+  isActive: boolean;
   availabilityStart: Date | null;
   availabilityEnd: Date | null;
   ageMin: number | null;
@@ -30,6 +31,7 @@ function toPayload(row: {
   price: unknown;
   quantity: number;
   maxPerOrder: number;
+  isActive: boolean;
   availabilityStart: Date | null;
   availabilityEnd: Date | null;
   ageMin: number | null;
@@ -45,6 +47,7 @@ function toPayload(row: {
     price: Number(row.price),
     quantity: row.quantity,
     maxPerOrder: row.maxPerOrder,
+    isActive: row.isActive,
     availabilityStart: row.availabilityStart,
     availabilityEnd: row.availabilityEnd,
     ageMin: row.ageMin,
@@ -89,6 +92,7 @@ export class TicketTypesService {
         price: dto.price,
         quantity: dto.quantity ?? 0,
         maxPerOrder: dto.maxPerOrder ?? 10,
+        isActive: dto.isActive ?? true,
         availabilityStart: dto.availabilityStart
           ? new Date(dto.availabilityStart)
           : null,
@@ -124,7 +128,7 @@ export class TicketTypesService {
       throw new NotFoundException('Event not found or not published');
     }
     const list = await this.prisma.ticketType.findMany({
-      where: { eventId },
+      where: { eventId, isActive: true },
       orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
     });
     return list.map(toPayload);
@@ -159,6 +163,7 @@ export class TicketTypesService {
         }),
         ...(dto.ageMin !== undefined && { ageMin: dto.ageMin }),
         ...(dto.ageMax !== undefined && { ageMax: dto.ageMax }),
+        ...(dto.isActive !== undefined && { isActive: dto.isActive }),
         ...(dto.sortOrder !== undefined && { sortOrder: dto.sortOrder }),
       },
     });

@@ -10,6 +10,7 @@ export interface EventDiscountPayload {
   name: string;
   type: string;
   discountPercent: number;
+  isActive: boolean;
   validTo: Date | null;
   minQuantity: number | null;
   ticketTypeIds: string[] | null;
@@ -24,6 +25,7 @@ function toPayload(row: {
   name: string;
   type: string;
   discountPercent: unknown;
+  isActive: boolean;
   validTo: Date | null;
   minQuantity: number | null;
   ticketTypeIds: unknown;
@@ -38,6 +40,7 @@ function toPayload(row: {
     name: row.name,
     type: row.type,
     discountPercent: Number(row.discountPercent),
+    isActive: row.isActive,
     validTo: row.validTo,
     minQuantity: row.minQuantity,
     ticketTypeIds: Array.isArray(ids) ? ids : null,
@@ -67,6 +70,7 @@ export class EventDiscountsService {
         name: dto.name,
         type: dto.type,
         discountPercent: dto.discountPercent,
+        isActive: dto.isActive ?? true,
         validTo: dto.validTo ? new Date(dto.validTo) : null,
         minQuantity: dto.minQuantity ?? null,
         ticketTypeIds: dto.ticketTypeIds != null ? dto.ticketTypeIds : undefined,
@@ -89,7 +93,7 @@ export class EventDiscountsService {
     const event = await this.prisma.event.findFirst({ where: { id: eventId, status: 'published' } });
     if (!event) throw new NotFoundException('Event not found or not published');
     const list = await this.prisma.eventDiscount.findMany({
-      where: { eventId },
+      where: { eventId, isActive: true },
       orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
     });
     return list.map(toPayload);
@@ -107,6 +111,7 @@ export class EventDiscountsService {
         ...(dto.discountPercent !== undefined && { discountPercent: dto.discountPercent }),
         ...(dto.validTo !== undefined && { validTo: dto.validTo ? new Date(dto.validTo) : null }),
         ...(dto.minQuantity !== undefined && { minQuantity: dto.minQuantity }),
+        ...(dto.isActive !== undefined && { isActive: dto.isActive }),
         ...(dto.ticketTypeIds !== undefined && { ticketTypeIds: dto.ticketTypeIds as Prisma.InputJsonValue }),
         ...(dto.sortOrder !== undefined && { sortOrder: dto.sortOrder }),
       },

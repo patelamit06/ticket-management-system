@@ -13,17 +13,19 @@ datasource db {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  passwordHash String   @map("password_hash")
-  name         String?
-  phone        String?
-  role         String   // super_admin | organizer | coordinator | attendee
-  country      String?
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  id                     String   @id @default(cuid())
+  email                  String   @unique
+  passwordHash           String   @map("password_hash")
+  name                   String?
+  phone                  String?
+  role                   String   // super_admin | organizer | coordinator | attendee
+  country                String?
+  stripeConnectAccountId String?  @map("stripe_connect_account_id") // For payouts (Stripe Connect)
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
 
   organizedEvents Event[]
+  orders         Order[]
 
   @@map("users")
   @@schema("ticket_db")
@@ -67,6 +69,7 @@ model Event {
   ticketTypes  TicketType[]
   discounts    EventDiscount[]
   media        EventMedia[]
+  orders       Order[]
 
   @@map("events")
   @@schema("ticket_db")
@@ -97,6 +100,7 @@ model TicketType {
   price             Decimal   @db.Decimal(10, 2)
   quantity          Int       @default(0)   // max capacity (0 = unlimited)
   maxPerOrder       Int       @default(10)  // 1-20
+  isActive          Boolean   @default(true) @map("is_active")
   availabilityStart DateTime? @map("availability_start")
   availabilityEnd   DateTime? @map("availability_end")
   ageMin            Int?      @map("age_min")
@@ -105,7 +109,8 @@ model TicketType {
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")
 
-  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  event      Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  orderItems OrderItem[]
 
   @@map("ticket_types")
   @@schema("ticket_db")
@@ -118,6 +123,7 @@ model EventDiscount {
   name            String    // e.g. "Early Bird", "Group 10+"
   type            String    // early_bird | group
   discountPercent Decimal   @map("discount_percent") @db.Decimal(5, 2)
+  isActive        Boolean   @default(true) @map("is_active")
   /// early_bird: valid until this date (inclusive)
   validTo         DateTime? @map("valid_to")
   /// group: minimum quantity in order to get this discount
@@ -131,5 +137,63 @@ model EventDiscount {
   event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   @@map("event_discounts")
+  @@schema("ticket_db")
+}
+
+/// Order: one per checkout (one event per order in v1). status: pending | paid | cancelled | expired.
+model Order {
+  id                      String    @id @default(cuid())
+  userId                  String?   @map("user_id")
+  eventId                 String    @map("event_id")
+  status                  String    @default("pending") // pending | paid | cancelled | expired
+  totalAmount             Decimal   @map("total_amount") @db.Decimal(10, 2)
+  currency                String    @default("USD") @db.VarChar(3)
+  stripePaymentIntentId   String?   @unique @map("stripe_payment_intent_id")
+  guestEmail              String?   @map("guest_email")
+  guestName               String?   @map("guest_name")
+  taxAmount               Decimal?  @map("tax_amount") @db.Decimal(10, 2)
+  taxCountry              String?   @map("tax_country") @db.VarChar(2)
+  applicationFeeAmount    Decimal?  @map("application_fee_amount") @db.Decimal(10, 2) // Platform fee (e.g. 5%)
+  createdAt               DateTime  @default(now()) @map("created_at")
+  updatedAt               DateTime  @updatedAt @map("updated_at")
+
+  user   User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  event  Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  items  OrderItem[]
+
+  @@map("orders")
+  @@schema("ticket_db")
+}
+
+/// Line item: ticket type + quantity and price at purchase.
+model OrderItem {
+  id              String   @id @default(cuid())
+  orderId         String   @map("order_id")
+  ticketTypeId    String   @map("ticket_type_id")
+  quantity        Int
+  priceAtPurchase Decimal  @map("price_at_purchase") @db.Decimal(10, 2)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  order        Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  ticketType   TicketType @relation(fields: [ticketTypeId], references: [id], onDelete: Cascade)
+  tickets      Ticket[]
+
+  @@map("order_items")
+  @@schema("ticket_db")
+}
+
+/// Issued ticket (one per quantity per OrderItem). Created on payment success.
+model Ticket {
+  id          String    @id @default(cuid())
+  orderItemId String    @map("order_item_id")
+  uniqueCode  String    @unique @map("unique_code")
+  usedAt      DateTime? @map("used_at") // Check-in time
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  orderItem OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+
+  @@map("tickets")
   @@schema("ticket_db")
 }

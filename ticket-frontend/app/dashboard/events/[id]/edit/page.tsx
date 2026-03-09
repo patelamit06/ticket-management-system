@@ -6,6 +6,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { ChevronUp, ChevronDown } from 'lucide-react';
 import { SiteHeader } from '@/components/site-header';
 import { useAuth } from '@/contexts/auth-context';
 import { useLocale } from '@/contexts/locale-context';
@@ -19,6 +20,7 @@ import {
 import {
   getTicketTypes,
   createTicketType,
+  updateTicketType,
   deleteTicketType,
   type TicketTypePayload,
   type CreateTicketTypeBody,
@@ -26,6 +28,7 @@ import {
 import {
   getEventDiscounts,
   createEventDiscount,
+  updateEventDiscount,
   deleteEventDiscount,
   type EventDiscountPayload,
   type CreateEventDiscountBody,
@@ -34,6 +37,7 @@ import {
   getEventMedia,
   uploadEventMedia,
   addEventMediaVideo,
+  reorderEventMedia,
   deleteEventMedia,
   type EventMediaPayload,
 } from '@/lib/event-media-api';
@@ -54,6 +58,7 @@ const ticketSchema = z.object({
   price: z.number().min(0),
   quantity: z.number().min(0).optional(),
   maxPerOrder: z.number().min(1).max(20).optional(),
+  isActive: z.boolean().optional(),
   ageMin: z.number().min(0).max(120).optional(),
   ageMax: z.number().min(0).max(120).optional(),
 });
@@ -62,6 +67,7 @@ const discountSchema = z.object({
   name: z.string().min(1),
   type: z.enum(['early_bird', 'group']),
   discountPercent: z.number().min(0).max(100),
+  isActive: z.boolean().optional(),
   validTo: z.string().optional(),
   minQuantity: z.number().min(1).optional(),
 });
@@ -111,6 +117,7 @@ export default function EditEventPage() {
       price: 0,
       quantity: 0,
       maxPerOrder: 10,
+      isActive: true,
       ageMin: undefined,
       ageMax: undefined,
     },
@@ -122,6 +129,7 @@ export default function EditEventPage() {
       name: '',
       type: 'early_bird',
       discountPercent: 0,
+      isActive: true,
       validTo: '',
       minQuantity: undefined,
     },
@@ -202,12 +210,13 @@ export default function EditEventPage() {
         price: data.price,
         quantity: data.quantity ?? 0,
         maxPerOrder: data.maxPerOrder ?? 10,
+        isActive: data.isActive ?? true,
         ageMin: data.ageMin,
         ageMax: data.ageMax,
       };
       const created = await createTicketType(eventId, body);
       setTicketTypes((prev) => [...prev, created]);
-      ticketForm.reset({ name: '', price: 0, quantity: 0, maxPerOrder: 10, ageMin: undefined, ageMax: undefined });
+      ticketForm.reset({ name: '', price: 0, quantity: 0, maxPerOrder: 10, isActive: true, ageMin: undefined, ageMax: undefined });
       setAddingTicket(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to add ticket type');
@@ -236,12 +245,13 @@ export default function EditEventPage() {
         name: data.name,
         type: data.type as 'early_bird' | 'group',
         discountPercent: data.discountPercent,
+        isActive: data.isActive ?? true,
         validTo: data.validTo || undefined,
         minQuantity: data.minQuantity,
       };
       const created = await createEventDiscount(eventId, body);
       setDiscounts((prev) => [...prev, created]);
-      discountForm.reset({ name: '', type: 'early_bird', discountPercent: 0, validTo: '', minQuantity: undefined });
+      discountForm.reset({ name: '', type: 'early_bird', discountPercent: 0, isActive: true, validTo: '', minQuantity: undefined });
       setAddingDiscount(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to add discount');
@@ -303,6 +313,23 @@ export default function EditEventPage() {
     }
   };
 
+  const handleMoveMedia = async (fromIndex: number, direction: 'up' | 'down') => {
+    if (!eventId || media.length < 2) return;
+    const toIndex = direction === 'up' ? fromIndex - 1 : fromIndex + 1;
+    if (toIndex < 0 || toIndex >= media.length) return;
+    setError(null);
+    const reordered = [...media];
+    const [removed] = reordered.splice(fromIndex, 1);
+    reordered.splice(toIndex, 0, removed);
+    const newIds = reordered.map((m) => m.id);
+    try {
+      const updated = await reorderEventMedia(eventId, newIds);
+      setMedia(updated);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to reorder');
+    }
+  };
+
   if (authLoading || !user) {
     return (
       <div className="min-h-screen flex flex-col bg-background">
@@ -318,7 +345,7 @@ export default function EditEventPage() {
     return (
       <div className="min-h-screen flex flex-col bg-background">
         <SiteHeader />
-        <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-8">
+        <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-8">
           <p className="text-muted-foreground">Event not found.</p>
           <Link href="/dashboard" className="mt-4 inline-block text-primary hover:underline">
             Back to dashboard
@@ -331,16 +358,24 @@ export default function EditEventPage() {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <SiteHeader />
-      <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-8 sm:px-6 sm:py-12">
-        <div className="mb-6 flex items-center gap-4">
-          <Link href="/dashboard" className="text-sm font-medium text-muted-foreground hover:text-foreground">
-            ← Dashboard
-          </Link>
-          <Link href={`/dashboard/events/${eventId}`} className="text-sm font-medium text-muted-foreground hover:text-foreground">
-            View event
-          </Link>
+      <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-8 sm:px-6 sm:py-12">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <Link href="/dashboard" className="text-sm font-medium text-muted-foreground hover:text-foreground">
+              ← Dashboard
+            </Link>
+            <Link href={`/dashboard/events/${eventId}`} className="text-sm font-medium text-muted-foreground hover:text-foreground">
+              View event
+            </Link>
+          </div>
+          {event && (
+            <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
+              {event.status}
+            </span>
+          )}
         </div>
         <h1 className="font-heading text-2xl font-bold text-foreground">Edit event</h1>
+        {event && <p className="mt-1 text-muted-foreground">{event.name}</p>}
         {error && (
           <div className="mt-4 rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive">
             {error}
@@ -408,14 +443,24 @@ export default function EditEventPage() {
               <h2 className="font-heading text-lg font-semibold text-foreground">Ticket types</h2>
               <ul className="mt-4 space-y-3">
                 {ticketTypes.map((tt) => (
-                  <li key={tt.id} className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-4 py-3">
-                    <span className="font-medium text-foreground">{tt.name}</span>
-                    <span className="text-sm text-muted-foreground">
-                      {tt.price === 0 ? 'Free' : `$${tt.price.toFixed(2)}`}
-                    </span>
-                    <button type="button" onClick={() => onRemoveTicket(tt.id)} className="text-sm text-destructive hover:underline">
-                      Remove
-                    </button>
+                  <li key={tt.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-muted/30 px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-foreground">{tt.name}</span>
+                      <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${tt.isActive ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' : 'bg-muted text-muted-foreground'}`}>
+                        {tt.isActive ? 'Active' : 'Inactive'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">
+                        {tt.price === 0 ? 'Free' : `$${tt.price.toFixed(2)}`}
+                      </span>
+                      <button type="button" onClick={async () => { if (!eventId) return; setError(null); try { const updated = await updateTicketType(eventId, tt.id, { isActive: !tt.isActive }); setTicketTypes((prev) => prev.map((t) => t.id === tt.id ? updated : t)); } catch (e) { setError(e instanceof Error ? e.message : 'Failed to update'); } }} className="text-sm text-primary hover:underline">
+                        {tt.isActive ? 'Deactivate' : 'Activate'}
+                      </button>
+                      <button type="button" onClick={() => onRemoveTicket(tt.id)} className="text-sm text-destructive hover:underline">
+                        Remove
+                      </button>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -435,6 +480,10 @@ export default function EditEventPage() {
                       <input type="number" step="0.01" min={0} className={inputClass} {...ticketForm.register('price', { valueAsNumber: true })} />
                     </div>
                   </div>
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" className="h-4 w-4 rounded border-input" {...ticketForm.register('isActive')} />
+                    <span className="text-sm font-medium text-foreground">Active (shown and sellable)</span>
+                  </label>
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div>
                       <label className="mb-1 block text-sm font-medium text-foreground">Max per order</label>
@@ -461,14 +510,24 @@ export default function EditEventPage() {
               <p className="mt-1 text-sm text-muted-foreground">Discount types (e.g. Early bird, Group) applied at checkout.</p>
               <ul className="mt-4 space-y-3">
                 {discounts.map((d) => (
-                  <li key={d.id} className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-4 py-3">
-                    <span className="font-medium text-foreground">{d.name}</span>
-                    <span className="text-sm text-muted-foreground">
-                      {d.discountPercent}% off
-                      {d.type === 'early_bird' && d.validTo && ` until ${new Date(d.validTo).toLocaleDateString()}`}
-                      {d.type === 'group' && d.minQuantity != null && ` · ${d.minQuantity}+ tickets`}
-                    </span>
-                    <button type="button" onClick={() => onRemoveDiscount(d.id)} className="text-sm text-destructive hover:underline">Remove</button>
+                  <li key={d.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-muted/30 px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-foreground">{d.name}</span>
+                      <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${d.isActive ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' : 'bg-muted text-muted-foreground'}`}>
+                        {d.isActive ? 'Active' : 'Inactive'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">
+                        {d.discountPercent}% off
+                        {d.type === 'early_bird' && d.validTo && ` until ${new Date(d.validTo).toLocaleDateString()}`}
+                        {d.type === 'group' && d.minQuantity != null && ` · ${d.minQuantity}+ tickets`}
+                      </span>
+                      <button type="button" onClick={async () => { if (!eventId) return; setError(null); try { const updated = await updateEventDiscount(eventId, d.id, { isActive: !d.isActive }); setDiscounts((prev) => prev.map((x) => x.id === d.id ? updated : x)); } catch (e) { setError(e instanceof Error ? e.message : 'Failed to update'); } }} className="text-sm text-primary hover:underline">
+                        {d.isActive ? 'Deactivate' : 'Activate'}
+                      </button>
+                      <button type="button" onClick={() => onRemoveDiscount(d.id)} className="text-sm text-destructive hover:underline">Remove</button>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -495,6 +554,10 @@ export default function EditEventPage() {
                     <label className="mb-1 block text-sm font-medium text-foreground">Discount % *</label>
                     <input type="number" min={0} max={100} className={inputClass} {...discountForm.register('discountPercent', { valueAsNumber: true })} />
                   </div>
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" className="h-4 w-4 rounded border-input" {...discountForm.register('isActive')} />
+                    <span className="text-sm font-medium text-foreground">Active (shown and applicable)</span>
+                  </label>
                   {discountForm.watch('type') === 'early_bird' && (
                     <div>
                       <label className="mb-1 block text-sm font-medium text-foreground">Valid until</label>
@@ -518,7 +581,7 @@ export default function EditEventPage() {
             <section className="mt-8 rounded-xl border border-border bg-card p-6">
               <h2 className="font-heading text-lg font-semibold text-foreground">Photos & videos</h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Images and video links shown in a carousel on the event page.
+                Order sets carousel sequence. Use arrows to move items up or down.
               </p>
               {media.some((m) => m.type === 'image') && media.some((m) => m.type === 'image' && imgLoadErrors.has(m.id)) && (
                 <p className="mt-2 text-xs text-amber-600 dark:text-amber-500">
@@ -526,28 +589,49 @@ export default function EditEventPage() {
                 </p>
               )}
               <ul className="mt-4 space-y-3">
-                {media.map((m) => (
+                {media.map((m, index) => (
                   <li key={m.id} className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3">
+                    <div className="flex flex-col gap-0">
+                      <button
+                        type="button"
+                        onClick={() => handleMoveMedia(index, 'up')}
+                        disabled={index === 0}
+                        className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40 disabled:pointer-events-none"
+                        aria-label="Move up"
+                      >
+                        <ChevronUp className="h-5 w-5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleMoveMedia(index, 'down')}
+                        disabled={index === media.length - 1}
+                        className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40 disabled:pointer-events-none"
+                        aria-label="Move down"
+                      >
+                        <ChevronDown className="h-5 w-5" />
+                      </button>
+                    </div>
+                    <span className="w-6 text-center text-sm tabular-nums text-muted-foreground">{index + 1}</span>
                     {m.type === 'image' ? (
                       imgLoadErrors.has(m.id) ? (
-                        <span className="flex h-12 w-16 items-center justify-center rounded bg-muted text-xs text-muted-foreground">Image</span>
+                        <span className="flex h-12 w-16 shrink-0 items-center justify-center rounded bg-muted text-xs text-muted-foreground">Image</span>
                       ) : (
                         <img
                           src={m.url}
                           alt={m.caption ?? ''}
-                          className="h-12 w-16 rounded object-cover bg-muted"
+                          className="h-12 w-16 shrink-0 rounded object-cover bg-muted"
                           referrerPolicy="no-referrer"
                           onError={() => setImgLoadErrors((prev) => new Set(prev).add(m.id))}
                         />
                       )
                     ) : (
-                      <span className="flex h-12 w-16 items-center justify-center rounded bg-muted text-xs text-muted-foreground">Video</span>
+                      <span className="flex h-12 w-16 shrink-0 items-center justify-center rounded bg-muted text-xs text-muted-foreground">Video</span>
                     )}
-                    <span className="flex-1 truncate text-sm text-muted-foreground">
+                    <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
                       {m.type === 'image' ? 'Image' : 'Video'}
                       {m.caption ? ` · ${m.caption}` : ''}
                     </span>
-                    <button type="button" onClick={() => handleRemoveMedia(m.id)} className="text-sm text-destructive hover:underline">Remove</button>
+                    <button type="button" onClick={() => handleRemoveMedia(m.id)} className="shrink-0 text-sm text-destructive hover:underline">Remove</button>
                   </li>
                 ))}
               </ul>

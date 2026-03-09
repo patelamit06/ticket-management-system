@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { CalendarPlus, CalendarDays } from 'lucide-react';
 import { SiteHeader } from '@/components/site-header';
+import { EventCard } from '@/components/event-card';
 import { useAuth } from '@/contexts/auth-context';
 import { getMyEvents, type EventPayload } from '@/lib/events-api';
 
@@ -31,7 +32,7 @@ export default function DashboardPage() {
     return (
       <div className="min-h-screen flex flex-col bg-background">
         <SiteHeader />
-        <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-8 sm:px-6 sm:py-12">
+        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 sm:py-12">
           <p className="text-muted-foreground">Loading…</p>
         </main>
       </div>
@@ -41,7 +42,7 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <SiteHeader />
-      <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-8 sm:px-6 sm:py-12">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 sm:py-12">
         <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="font-heading text-xl font-bold text-foreground sm:text-2xl md:text-3xl">
             Dashboard
@@ -74,22 +75,14 @@ export default function DashboardPage() {
               </Link>
             </div>
           ) : (
-            <ul className="mt-4 space-y-3">
+            <ul className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {events.map((ev) => (
                 <li key={ev.id}>
-                  <Link
+                  <EventCard
+                    ev={ev}
                     href={`/dashboard/events/${ev.id}`}
-                    className="block rounded-xl border border-border bg-card p-4 transition-colors hover:bg-muted/30"
-                  >
-                    <span className="font-medium text-foreground">{ev.name}</span>
-                    <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                      {ev.status}
-                    </span>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {new Date(ev.startDate).toLocaleDateString()}
-                      {ev.location ? ` · ${ev.location}` : ''}
-                    </p>
-                  </Link>
+                    variant="dashboard"
+                  />
                 </li>
               ))}
             </ul>
