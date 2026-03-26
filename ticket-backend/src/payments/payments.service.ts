@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import Stripe from 'stripe';
 import { OrdersService } from '../orders/orders.service';
 import { StripeService } from '../stripe/stripe.service';
@@ -41,32 +41,42 @@ export class PaymentsService {
 
     const stripe = this.stripeService.getClient();
 
-    if (order.stripePaymentIntentId) {
-      const existing = await stripe.paymentIntents.retrieve(order.stripePaymentIntentId);
-      if (existing.status !== 'canceled') {
-        return { clientSecret: existing.client_secret! };
+    try {
+      if (order.stripePaymentIntentId) {
+        const existing = await stripe.paymentIntents.retrieve(order.stripePaymentIntentId);
+        if (existing.status !== 'canceled') {
+          return { clientSecret: existing.client_secret! };
+        }
       }
-    }
 
-    const applicationFeeCents = Math.floor(amountCents * (PLATFORM_FEE_PERCENT / 100));
-    const params: Stripe.PaymentIntentCreateParams = {
-      amount: amountCents,
-      currency: order.currency.toLowerCase(),
-      metadata: { orderId },
-      automatic_payment_methods: { enabled: true },
-    };
-
-    if (order.organizerStripeConnectAccountId) {
-      params.transfer_data = {
-        destination: order.organizerStripeConnectAccountId,
+      const applicationFeeCents = Math.floor(amountCents * (PLATFORM_FEE_PERCENT / 100));
+      const params: Stripe.PaymentIntentCreateParams = {
+        amount: amountCents,
+        currency: order.currency.toLowerCase(),
+        metadata: { orderId },
+        automatic_payment_methods: { enabled: true },
       };
-      params.application_fee_amount = applicationFeeCents;
+
+      if (order.organizerStripeConnectAccountId) {
+        params.transfer_data = {
+          destination: order.organizerStripeConnectAccountId,
+        };
+        params.application_fee_amount = applicationFeeCents;
+      }
+
+      const paymentIntent = await stripe.paymentIntents.create(params);
+      await this.ordersService.setPaymentIntentId(orderId, paymentIntent.id);
+
+      return { clientSecret: paymentIntent.client_secret! };
+    } catch (err) {
+      if (err instanceof Stripe.errors.StripeAuthenticationError) {
+        throw new InternalServerErrorException('Payment provider configuration error. Please contact support.');
+      }
+      if (err instanceof Stripe.errors.StripeError) {
+        throw new BadRequestException(err.message);
+      }
+      throw err;
     }
-
-    const paymentIntent = await stripe.paymentIntents.create(params);
-    await this.ordersService.setPaymentIntentId(orderId, paymentIntent.id);
-
-    return { clientSecret: paymentIntent.client_secret! };
   }
 
   /**
@@ -126,11 +136,66 @@ export class PaymentsService {
       },
     };
 
-    const session = await stripe.checkout.sessions.create(params);
-    if (!session.url) {
-      throw new BadRequestException('Could not create checkout session');
+    try {
+      const session = await stripe.checkout.sessions.create(params);
+      if (!session.url) {
+        throw new BadRequestException('Could not create checkout session');
+      }
+      return { url: session.url };
+    } catch (err) {
+      if (err instanceof BadRequestException) throw err;
+      if (err instanceof Stripe.errors.StripeAuthenticationError) {
+        throw new InternalServerErrorException('Payment provider configuration error. Please contact support.');
+      }
+      if (err instanceof Stripe.errors.StripeError) {
+        throw new BadRequestException(err.message);
+      }
+      throw err;
     }
-    return { url: session.url };
+  }
+
+  /**
+   * Verify a PaymentIntent directly with Stripe and activate the order if succeeded.
+   * Used as a webhook fallback (e.g. in local dev where Stripe can't reach localhost).
+   * Idempotent: safe to call multiple times.
+   */
+  async verifyPayment(orderId: string): Promise<{ status: string }> {
+    if (!this.stripeService.isConfigured()) {
+      throw new BadRequestException('Payments are not configured');
+    }
+
+    const order = await this.ordersService.findByIdForPayment(orderId);
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    // Already paid — tickets already exist
+    if (order.status === 'paid') {
+      return { status: 'paid' };
+    }
+
+    if (!order.stripePaymentIntentId) {
+      return { status: order.status };
+    }
+
+    const stripe = this.stripeService.getClient();
+    try {
+      const pi = await stripe.paymentIntents.retrieve(order.stripePaymentIntentId);
+      if (pi.status === 'succeeded') {
+        await this.ordersService.markPaid(order.id, pi.id);
+        await this.ticketsService.createForOrder(order.id);
+        return { status: 'paid' };
+      }
+      return { status: pi.status };
+    } catch (err) {
+      if (err instanceof Stripe.errors.StripeAuthenticationError) {
+        throw new InternalServerErrorException('Payment provider configuration error.');
+      }
+      if (err instanceof Stripe.errors.StripeError) {
+        throw new BadRequestException(err.message);
+      }
+      throw err;
+    }
   }
 
   /**

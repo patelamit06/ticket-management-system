@@ -41,6 +41,18 @@ export class OrdersController {
     return this.ordersService.create(dto, req.user?.id);
   }
 
+  @Get('event/:eventId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'List paid orders for an event (organizer only)' })
+  @ApiResponse({ status: 200, description: 'List of paid orders' })
+  findByEvent(
+    @Req() req: Request & { user: User },
+    @Param('eventId') eventId: string,
+  ): Promise<OrderPayload[]> {
+    return this.ordersService.findByEvent(eventId, req.user.id);
+  }
+
   @Get('my')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()

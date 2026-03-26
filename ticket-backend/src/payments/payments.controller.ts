@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Headers,
+  HttpCode,
   Param,
   Post,
   Req,
@@ -30,6 +31,17 @@ export class PaymentsController {
     @Body() dto: CreatePaymentIntentDto,
   ): Promise<{ clientSecret: string }> {
     return this.paymentsService.createPaymentIntent(orderId, dto);
+  }
+
+  /** Public: verify PaymentIntent with Stripe and activate order + tickets. Webhook fallback. */
+  @Post('orders/:orderId/verify')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Verify payment with Stripe and activate order (webhook fallback)' })
+  @ApiResponse({ status: 200, description: 'Order status after verification' })
+  verifyPayment(
+    @Param('orderId') orderId: string,
+  ): Promise<{ status: string }> {
+    return this.paymentsService.verifyPayment(orderId);
   }
 
   /** Public: no auth – guests must be able to pay. */

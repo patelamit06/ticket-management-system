@@ -99,6 +99,43 @@ export async function getMyOrders(): Promise<OrderPayload[]> {
   return fetchApi<OrderPayload[]>('/orders/my');
 }
 
+export async function getEventOrders(eventId: string): Promise<OrderPayload[]> {
+  return fetchApi<OrderPayload[]>(`/orders/event/${eventId}`);
+}
+
+export async function getCheckInStats(eventId: string): Promise<{ total: number; checkedIn: number; remaining: number }> {
+  return fetchApi<{ total: number; checkedIn: number; remaining: number }>(`/check-in/event/${eventId}/stats`);
+}
+
+export interface TicketPayload {
+  id: string;
+  uniqueCode: string;
+  usedAt: string | null;
+  ticketTypeName: string;
+  orderItemId: string;
+}
+
+/** Public – verify payment with Stripe and activate tickets (webhook fallback). */
+export async function verifyPayment(orderId: string): Promise<{ status: string }> {
+  return fetchApiPublic<{ status: string }>(`/payments/orders/${orderId}/verify`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
+
+export async function getOrderTickets(
+  orderId: string,
+  guestEmail?: string,
+): Promise<TicketPayload[]> {
+  const params = guestEmail ? new URLSearchParams({ email: guestEmail }) : '';
+  const path = `/orders/${orderId}/tickets${params ? `?${params}` : ''}`;
+  try {
+    return await fetchApi<TicketPayload[]>(path);
+  } catch {
+    return [];
+  }
+}
+
 /** Public endpoint – never sends Authorization so guests never get 401. */
 export async function createPaymentIntent(orderId: string): Promise<{ clientSecret: string }> {
   return fetchApiPublic<{ clientSecret: string }>(`/payments/orders/${orderId}/create-payment-intent`, {

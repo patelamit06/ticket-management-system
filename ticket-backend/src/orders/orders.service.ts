@@ -161,6 +161,25 @@ export class OrdersService {
     return this.toPayload(order);
   }
 
+  /**
+   * List all paid orders for an event. Only accessible to the event organizer.
+   */
+  async findByEvent(eventId: string, organizerId: string): Promise<OrderPayload[]> {
+    const event = await this.prisma.event.findUnique({ where: { id: eventId }, select: { organizerId: true } });
+    if (!event || event.organizerId !== organizerId) {
+      throw new ForbiddenException('You do not have access to this event');
+    }
+    const orders = await this.prisma.order.findMany({
+      where: { eventId, status: 'paid' },
+      include: {
+        event: true,
+        items: { include: { ticketType: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    return orders.map((o) => this.toPayload(o));
+  }
+
   /** List orders for the authenticated user. */
   async findMy(userId: string): Promise<OrderPayload[]> {
     const orders = await this.prisma.order.findMany({
