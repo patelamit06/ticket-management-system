@@ -11,8 +11,10 @@ import { EventDiscountsModule } from './event-discounts/event-discounts.module';
 import { EventMediaModule } from './event-media/event-media.module';
 import { MinioModule } from './minio/minio.module';
 import { StripeModule } from './stripe/stripe.module';
+import { SwishModule } from './swish/swish.module';
 import { OrdersModule } from './orders/orders.module';
 import { PaymentsModule } from './payments/payments.module';
+import { SwishPaymentsModule } from './swish-payments/swish-payments.module';
 import { TicketsModule } from './tickets/tickets.module';
 import { CheckInModule } from './check-in/check-in.module';
 import { AdminModule } from './admin/admin.module';
@@ -32,8 +34,10 @@ import { CountriesModule } from './countries/countries.module';
     EventMediaModule,
     MinioModule,
     StripeModule,
+    SwishModule,
     OrdersModule,
     PaymentsModule,
+    SwishPaymentsModule,
     TicketsModule,
     CheckInModule,
     AdminModule,

@@ -155,3 +155,29 @@ export async function createCheckoutSession(
     body: JSON.stringify({ successUrl, cancelUrl }),
   });
 }
+
+export interface SwishCreateResult {
+  swishPaymentRequestId: string;
+  swishPaymentId: string;
+  paymentRequestToken: string | null;
+  status: 'CREATED' | 'PAID' | 'DECLINED' | 'ERROR' | 'CANCELLED';
+}
+
+/** Public endpoint – create a Swish payment request (SEK only). */
+export async function createSwishPayment(
+  orderId: string,
+  body: { payerAlias?: string; message?: string } = {},
+): Promise<SwishCreateResult> {
+  return fetchApiPublic<SwishCreateResult>(`/payments/swish/orders/${orderId}`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+/** Public endpoint – poll Swish for status (callback fallback). */
+export async function verifySwishPayment(swishPaymentRequestId: string): Promise<{ status: string }> {
+  return fetchApiPublic<{ status: string }>(`/payments/swish/${swishPaymentRequestId}/verify`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}

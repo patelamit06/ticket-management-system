@@ -1,5 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsOptional, IsDateString, MinLength, MaxLength } from 'class-validator';
+import { IsString, IsOptional, IsDateString, IsIn, MinLength, MaxLength } from 'class-validator';
+
+const SUPPORTED_CURRENCIES = ['USD', 'EUR', 'GBP', 'SEK', 'INR'] as const;
 
 export class CreateEventDto {
   @ApiProperty({ example: 'Summer Music Festival 2026' })
@@ -49,4 +51,9 @@ export class CreateEventDto {
   @IsString()
   @MaxLength(100)
   timezone?: string;
+
+  @ApiPropertyOptional({ enum: SUPPORTED_CURRENCIES, example: 'USD' })
+  @IsOptional()
+  @IsIn(SUPPORTED_CURRENCIES)
+  currency?: string;
 }

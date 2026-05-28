@@ -60,6 +60,8 @@ model Event {
   country     String?   // ISO code e.g. US, IN (for filtering)
   city        String?
   timezone    String?
+  /// ISO 4217 currency used for all ticket prices + orders on this event. e.g. USD, SEK, EUR.
+  currency    String    @default("USD") @db.VarChar(3)
   /// Quantity-based discount tiers applied at order level: [{ "maxQuantity": 5, "discountPercent": 5 }, ...]
   groupDiscountTiers Json?   @map("group_discount_tiers")
   createdAt   DateTime  @default(now()) @map("created_at")
@@ -160,8 +162,41 @@ model Order {
   user   User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   event  Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
   items  OrderItem[]
+  swishPayments SwishPaymentRequest[]
 
   @@map("orders")
+  @@schema("ticket_db")
+}
+
+/// Swish payment request. One per attempt; an Order can have multiple if the first expires/fails.
+/// status: CREATED | PAID | DECLINED | ERROR | CANCELLED  (mirrors Swish CPC API v2)
+model SwishPaymentRequest {
+  id                     String    @id @default(cuid())
+  orderId                String    @map("order_id")
+  /// UUID we generate (uppercase, no dashes). Used as the Swish instructionUUID in the URL path.
+  instructionUuid        String    @unique @map("instruction_uuid")
+  /// Our human-readable reference echoed back in callbacks (<=36 chars, [A-Za-z0-9]).
+  payeePaymentReference  String    @map("payee_payment_reference")
+  /// Swish-side payment id (returned in Location header). Null until Swish accepts the request.
+  swishPaymentId         String?   @unique @map("swish_payment_id")
+  /// Token used for app-switch / QR rendering (returned in PaymentRequestToken header for e-commerce).
+  paymentRequestToken    String?   @map("payment_request_token")
+  amount                 Decimal   @db.Decimal(10, 2)
+  currency               String    @default("SEK") @db.VarChar(3)
+  payerAlias             String?   @map("payer_alias")  // E.164-ish, e.g. 46712345678 (m-commerce only)
+  status                 String    @default("CREATED")
+  /// Swish error code from callback when status is ERROR/DECLINED (e.g. BANKIDCL, PAYEE_NOT_ENROLLED).
+  errorCode              String?   @map("error_code")
+  errorMessage           String?   @map("error_message")
+  /// Raw callback payload, kept for debugging/auditing.
+  rawCallback            Json?     @map("raw_callback")
+  createdAt              DateTime  @default(now()) @map("created_at")
+  updatedAt              DateTime  @updatedAt @map("updated_at")
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@map("swish_payment_requests")
   @@schema("ticket_db")
 }
 

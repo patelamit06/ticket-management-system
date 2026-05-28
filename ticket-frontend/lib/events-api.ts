@@ -23,12 +23,16 @@ export interface EventPayload {
   country: string | null;
   city: string | null;
   timezone: string | null;
+  currency: string;
   groupDiscountTiers: unknown;
   createdAt: string;
   updatedAt: string;
   /** Public list/detail: images and video URLs */
   media?: EventMediaItem[];
 }
+
+export const SUPPORTED_CURRENCIES = ['USD', 'EUR', 'GBP', 'SEK', 'INR'] as const;
+export type SupportedCurrency = (typeof SUPPORTED_CURRENCIES)[number];
 
 export interface CreateEventBody {
   name: string;
@@ -40,6 +44,7 @@ export interface CreateEventBody {
   country?: string;
   city?: string;
   timezone?: string;
+  currency?: SupportedCurrency;
 }
 
 export interface UpdateEventBody {
@@ -53,6 +58,7 @@ export interface UpdateEventBody {
   country?: string;
   city?: string;
   timezone?: string;
+  currency?: SupportedCurrency;
 }
 
 export async function createEvent(body: CreateEventBody): Promise<EventPayload> {

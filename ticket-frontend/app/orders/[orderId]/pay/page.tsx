@@ -5,13 +5,23 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import QRCode from 'react-qr-code';
 import { SiteHeader } from '@/components/site-header';
 import { SiteFooter } from '@/components/site-footer';
-import { createPaymentIntent, getOrder, type OrderPayload } from '@/lib/orders-api';
+import {
+  createPaymentIntent,
+  createSwishPayment,
+  verifySwishPayment,
+  getOrder,
+  type OrderPayload,
+  type SwishCreateResult,
+} from '@/lib/orders-api';
 
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
   : null;
+
+type Method = 'card' | 'swish';
 
 function PaymentForm({
   orderId,
@@ -64,9 +74,7 @@ function PaymentForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      <PaymentElement
-        options={{ layout: 'tabs' }}
-      />
+      <PaymentElement options={{ layout: 'tabs' }} />
       {error && (
         <p
           className="rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive"
@@ -86,12 +94,138 @@ function PaymentForm({
   );
 }
 
+function SwishPanel({
+  orderId,
+  order,
+}: {
+  orderId: string;
+  order: OrderPayload;
+}) {
+  const router = useRouter();
+  const [request, setRequest] = React.useState<SwishCreateResult | null>(null);
+  const [submitting, setSubmitting] = React.useState(false);
+  const [polling, setPolling] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const [status, setStatus] = React.useState<string | null>(null);
+
+  const supportsSwish = order.currency.toUpperCase() === 'SEK';
+
+  React.useEffect(() => {
+    if (!request || polling) return;
+    setPolling(true);
+    let cancelled = false;
+    const interval = window.setInterval(async () => {
+      try {
+        const { status: s } = await verifySwishPayment(request.swishPaymentRequestId);
+        if (cancelled) return;
+        setStatus(s);
+        if (s === 'PAID') {
+          window.clearInterval(interval);
+          router.push(`/orders/${orderId}/success`);
+        } else if (s === 'DECLINED' || s === 'ERROR' || s === 'CANCELLED') {
+          window.clearInterval(interval);
+          setError(`Payment ${s.toLowerCase()}. Try again.`);
+        }
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Verification failed');
+      }
+    }, 2000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [request, polling, orderId, router]);
+
+  const handleStart = async () => {
+    setError(null);
+    setSubmitting(true);
+    try {
+      const result = await createSwishPayment(orderId);
+      setRequest(result);
+      setStatus(result.status);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create Swish payment');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (!supportsSwish) {
+    return (
+      <div className="rounded-lg bg-muted/50 px-4 py-6 text-sm text-muted-foreground">
+        Swish is only available for orders priced in SEK. This order is in {order.currency}.
+      </div>
+    );
+  }
+
+  if (!request) {
+    return (
+      <div className="space-y-4">
+        <p className="text-sm text-muted-foreground">
+          Pay {order.totalAmount.toFixed(2)} SEK with Swish. You&apos;ll scan a QR code with the
+          Swish app, or open it directly on this phone.
+        </p>
+        {error && (
+          <p className="rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
+            {error}
+          </p>
+        )}
+        <button
+          type="button"
+          onClick={handleStart}
+          disabled={submitting}
+          className="w-full rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
+        >
+          {submitting ? 'Starting…' : 'Pay with Swish'}
+        </button>
+      </div>
+    );
+  }
+
+  const appSwitchUrl = request.paymentRequestToken
+    ? `swish://paymentrequest?token=${request.paymentRequestToken}&callbackurl=${encodeURIComponent(
+        `${typeof window !== 'undefined' ? window.location.origin : ''}/orders/${orderId}/success`,
+      )}`
+    : null;
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-muted-foreground">
+        Open the Swish app and scan this QR code, or tap the button below if you&apos;re on a
+        phone with Swish installed.
+      </p>
+      {request.paymentRequestToken && (
+        <div className="flex justify-center rounded-xl bg-white p-6">
+          <QRCode value={request.paymentRequestToken} size={200} />
+        </div>
+      )}
+      {appSwitchUrl && (
+        <a
+          href={appSwitchUrl}
+          className="block w-full rounded-xl bg-primary px-6 py-3 text-center text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90"
+        >
+          Open Swish app
+        </a>
+      )}
+      <p className="text-center text-sm text-muted-foreground">
+        Waiting for payment… status: <span className="font-mono">{status ?? 'CREATED'}</span>
+      </p>
+      {error && (
+        <p className="rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function PayPage() {
   const params = useParams();
   const router = useRouter();
   const orderId = typeof params.orderId === 'string' ? params.orderId : null;
   const [order, setOrder] = React.useState<OrderPayload | null>(null);
   const [clientSecret, setClientSecret] = React.useState<string | null>(null);
+  const [method, setMethod] = React.useState<Method>('card');
   const [loading, setLoading] = React.useState(!!orderId);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -147,9 +281,7 @@ export default function PayPage() {
         }
         if (cancelled) return;
         if (!o) {
-          setError(
-            'Order not found. Use the link from your confirmation or sign in.'
-          );
+          setError('Order not found. Use the link from your confirmation or sign in.');
           setLoading(false);
           return;
         }
@@ -245,13 +377,37 @@ export default function PayPage() {
         <h1 className="font-heading text-2xl font-bold text-foreground">Payment</h1>
         <p className="mt-1 text-muted-foreground">{order!.eventName}</p>
         <p className="mt-1 font-semibold text-foreground">
-          ${order!.totalAmount.toFixed(2)}
-        </p>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Card number, expiry, and CVC are validated as you type.
+          {order!.currency.toUpperCase() === 'SEK'
+            ? `${order!.totalAmount.toFixed(2)} SEK`
+            : `$${order!.totalAmount.toFixed(2)}`}
         </p>
 
-        {clientSecret && order && (
+        <div className="mt-6 inline-flex rounded-xl border border-border bg-card p-1">
+          <button
+            type="button"
+            onClick={() => setMethod('card')}
+            className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
+              method === 'card'
+                ? 'bg-primary text-primary-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            Card
+          </button>
+          <button
+            type="button"
+            onClick={() => setMethod('swish')}
+            className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
+              method === 'swish'
+                ? 'bg-primary text-primary-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            Swish
+          </button>
+        </div>
+
+        {method === 'card' && clientSecret && order && (
           <div className="mt-8 rounded-xl border border-border bg-card p-6">
             <Elements
               stripe={stripePromise}
@@ -265,6 +421,12 @@ export default function PayPage() {
             >
               <PaymentForm orderId={orderId} order={order} />
             </Elements>
+          </div>
+        )}
+
+        {method === 'swish' && order && (
+          <div className="mt-8 rounded-xl border border-border bg-card p-6">
+            <SwishPanel orderId={orderId} order={order} />
           </div>
         )}
       </main>

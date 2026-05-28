@@ -31,6 +31,7 @@ export interface EventPayload {
   country: string | null;
   city: string | null;
   timezone: string | null;
+  currency: string;
   groupDiscountTiers: unknown;
   createdAt: Date;
   updatedAt: Date;
@@ -57,6 +58,7 @@ function toEventPayload(row: {
   country: string | null;
   city: string | null;
   timezone: string | null;
+  currency: string;
   groupDiscountTiers: unknown;
   createdAt: Date;
   updatedAt: Date;
@@ -74,6 +76,7 @@ function toEventPayload(row: {
     country: row.country,
     city: row.city,
     timezone: row.timezone,
+    currency: row.currency,
     groupDiscountTiers: row.groupDiscountTiers,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
@@ -100,6 +103,7 @@ export class EventsService {
         country: dto.country,
         city: dto.city,
         timezone: dto.timezone,
+        ...(dto.currency !== undefined && { currency: dto.currency }),
       },
     });
     return toEventPayload(event);
@@ -171,6 +175,7 @@ export class EventsService {
         ...(dto.country !== undefined && { country: dto.country }),
         ...(dto.city !== undefined && { city: dto.city }),
         ...(dto.timezone !== undefined && { timezone: dto.timezone }),
+        ...(dto.currency !== undefined && { currency: dto.currency }),
       },
     });
     return toEventPayload(updated);

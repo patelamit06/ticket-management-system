@@ -31,6 +31,14 @@
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "bcrypt",
+      "@prisma/client",
+      "@prisma/engines",
+      "prisma"
+    ]
+  },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.3",
@@ -44,6 +52,7 @@
     "bcrypt": "^5.1.1",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.3",
+    "express": "^5.2.1",
     "minio": "^8.0.7",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",

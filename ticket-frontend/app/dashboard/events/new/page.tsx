@@ -14,8 +14,10 @@ import {
   createEvent,
   updateEvent,
   getEvent,
+  SUPPORTED_CURRENCIES,
   type EventPayload,
   type CreateEventBody,
+  type SupportedCurrency,
 } from '@/lib/events-api';
 import {
   getTicketTypes,
@@ -48,6 +50,7 @@ const eventDetailsSchema = z.object({
   country: z.string().optional(),
   city: z.string().max(200).optional(),
   timezone: z.string().max(100).optional(),
+  currency: z.enum(SUPPORTED_CURRENCIES),
 });
 
 type EventDetailsForm = z.infer<typeof eventDetailsSchema>;
@@ -103,6 +106,7 @@ export default function NewEventPage() {
       country: '',
       city: '',
       timezone: '',
+      currency: 'USD' as SupportedCurrency,
     },
   });
 
@@ -155,6 +159,7 @@ export default function NewEventPage() {
         country: data.country || undefined,
         city: data.city || undefined,
         timezone: data.timezone || undefined,
+        currency: data.currency,
       };
       const created = await createEvent(body);
       setEventId(created.id);
@@ -467,6 +472,25 @@ export default function NewEventPage() {
                     {...eventForm.register('city')}
                   />
                 </div>
+              </div>
+              <div>
+                <label htmlFor="currency" className="mb-1 block text-sm font-medium text-foreground">
+                  Currency *
+                </label>
+                <select
+                  id="currency"
+                  className={selectClass}
+                  {...eventForm.register('currency')}
+                >
+                  {SUPPORTED_CURRENCIES.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Ticket prices and orders use this currency. Pick SEK to accept Swish.
+                </p>
               </div>
             </section>
             <button

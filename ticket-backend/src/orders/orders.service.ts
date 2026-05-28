@@ -112,7 +112,7 @@ export class OrdersService {
     }
 
     const totalAmount = totalCents / 100;
-    const currency = 'USD';
+    const currency = event.currency;
 
     const order = await this.prisma.order.create({
       data: {
@@ -244,6 +244,17 @@ export class OrdersService {
         status: 'paid',
         stripePaymentIntentId,
       },
+    });
+  }
+
+  /**
+   * Mark order paid for a non-Stripe provider (e.g. Swish). The provider reference is informational
+   * — the authoritative payment record lives on the provider's own table (SwishPaymentRequest).
+   */
+  async markPaidExternal(orderId: string, _providerReference: string): Promise<void> {
+    await this.prisma.order.update({
+      where: { id: orderId },
+      data: { status: 'paid' },
     });
   }
 

@@ -2,6 +2,7 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsString, IsOptional, IsDateString, IsIn, MinLength, MaxLength } from 'class-validator';
 
 const STATUSES = ['draft', 'pending_approval', 'published', 'cancelled'] as const;
+const SUPPORTED_CURRENCIES = ['USD', 'EUR', 'GBP', 'SEK', 'INR'] as const;
 
 export class UpdateEventDto {
   @ApiPropertyOptional()
@@ -59,4 +60,9 @@ export class UpdateEventDto {
   @IsString()
   @MaxLength(100)
   timezone?: string;
+
+  @ApiPropertyOptional({ enum: SUPPORTED_CURRENCIES })
+  @IsOptional()
+  @IsIn(SUPPORTED_CURRENCIES)
+  currency?: string;
 }
