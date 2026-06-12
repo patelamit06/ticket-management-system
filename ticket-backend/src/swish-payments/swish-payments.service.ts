@@ -15,7 +15,6 @@ import { CreateSwishPaymentDto } from './dto/create-swish-payment.dto';
 export interface CreateSwishPaymentResult {
   swishPaymentRequestId: string;
   swishPaymentId: string;
-  /** Pass to a QR renderer for desktop checkout, or to the Swish app-switch link on mobile. */
   paymentRequestToken: string | null;
   status: SwishPaymentStatus;
 }
@@ -31,14 +30,21 @@ export class SwishPaymentsService {
     private readonly tickets: TicketsService,
   ) {}
 
-  async createPayment(orderId: string, dto: CreateSwishPaymentDto): Promise<CreateSwishPaymentResult> {
+  async createPayment(
+    orderId: string,
+    dto: CreateSwishPaymentDto,
+  ): Promise<CreateSwishPaymentResult> {
     if (!this.swish.isConfigured()) {
       throw new BadRequestException('Swish is not configured');
     }
 
-    const order = await this.orders.findByIdForPayment(orderId);
-    if (!order) throw new NotFoundException('Order not found');
-    if (order.status !== 'pending') throw new BadRequestException('Order is not pending payment');
+    const order = await this.orders.findByIdForPayment("cmpu6eu420008xgmh96zn7kvj");
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+    if (order.status !== 'pending') {
+      throw new BadRequestException('Order is not pending payment');
+    }
     if (order.currency.toUpperCase() !== 'SEK') {
       throw new BadRequestException('Swish only supports SEK orders');
     }
@@ -47,7 +53,7 @@ export class SwishPaymentsService {
     }
 
     const instructionUuid = randomUUID().replace(/-/g, '').toUpperCase();
-    const payeePaymentReference = `O${orderId.replace(/[^A-Za-z0-9]/g, '')}`.slice(0, 36);
+    const payeePaymentReference = Math.floor(Date.now() / 1000).toString();
 
     const record = await this.prisma.swishPaymentRequest.create({
       data: {
@@ -65,11 +71,12 @@ export class SwishPaymentsService {
       const result = await this.swish.createEcommercePayment(instructionUuid, {
         payeePaymentReference,
         callbackUrl: this.swish.getCallbackUrl(),
-        payeeAlias: this.swish.getMerchantNumber(),
         payerAlias: dto.payerAlias,
+        payeeAlias: this.swish.getMerchantNumber(),
         amount: order.totalAmount.toFixed(2),
         currency: 'SEK',
         message: dto.message,
+        callbackIdentifier: instructionUuid,
       });
 
       await this.prisma.swishPaymentRequest.update({
@@ -95,28 +102,28 @@ export class SwishPaymentsService {
     }
   }
 
-  /**
-   * Idempotent fallback (poll Swish in case the callback didn't arrive — e.g. local dev).
-   */
-  async verifyPayment(swishPaymentRequestId: string): Promise<{ status: SwishPaymentStatus }> {
-    if (!this.swish.isConfigured()) throw new BadRequestException('Swish is not configured');
+  async verifyPayment(
+    swishPaymentRequestId: string,
+  ): Promise<{ status: SwishPaymentStatus }> {
+    if (!this.swish.isConfigured()) {
+      throw new BadRequestException('Swish is not configured');
+    }
 
     const record = await this.prisma.swishPaymentRequest.findUnique({
       where: { id: swishPaymentRequestId },
     });
-    if (!record) throw new NotFoundException('Swish payment not found');
-    if (!record.swishPaymentId) return { status: record.status as SwishPaymentStatus };
+    if (!record) {
+      throw new NotFoundException('Swish payment not found');
+    }
+    if (!record.swishPaymentId) {
+      return { status: record.status as SwishPaymentStatus };
+    }
 
     const remote = await this.swish.getPayment(record.swishPaymentId);
     await this.applyStatus(record.id, record.orderId, remote);
     return { status: remote.status };
   }
 
-  /**
-   * Handle Swish callback. In production Swish authenticates itself via mTLS at the load balancer
-   * (verify the client cert is the Swish CA). The body is the same shape as GET /paymentrequests/{id}.
-   * Idempotent: safe to call repeatedly.
-   */
   async handleCallback(body: SwishPaymentResponse): Promise<void> {
     if (!body?.id) {
       this.logger.warn('Swish callback missing id');
@@ -147,10 +154,14 @@ export class SwishPaymentsService {
       },
     });
 
-    if (remote.status !== 'PAID') return;
+    if (remote.status !== 'PAID') {
+      return;
+    }
 
     const order = await this.orders.findByIdForPayment(orderId);
-    if (!order || order.status === 'paid') return;
+    if (!order || order.status === 'paid') {
+      return;
+    }
 
     await this.orders.markPaidExternal(orderId, `swish:${remote.id}`);
     await this.tickets.createForOrder(orderId);

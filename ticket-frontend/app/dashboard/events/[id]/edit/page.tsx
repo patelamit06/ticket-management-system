@@ -32,6 +32,7 @@ import {
   deleteEventDiscount,
   type EventDiscountPayload,
   type CreateEventDiscountBody,
+  type UpdateEventDiscountBody,
 } from '@/lib/event-discounts-api';
 import {
   getEventMedia,
@@ -89,6 +90,7 @@ export default function EditEventPage() {
   const [saving, setSaving] = React.useState(false);
   const [addingTicket, setAddingTicket] = React.useState(false);
   const [addingDiscount, setAddingDiscount] = React.useState(false);
+  const [editingDiscountId, setEditingDiscountId] = React.useState<string | null>(null);
   const [media, setMedia] = React.useState<EventMediaPayload[]>([]);
   const [addingVideo, setAddingVideo] = React.useState(false);
   const [videoUrl, setVideoUrl] = React.useState('');
@@ -270,6 +272,44 @@ export default function EditEventPage() {
       setError(e instanceof Error ? e.message : 'Failed to remove');
     }
   };
+
+  const handleEditDiscount = (discount: EventDiscountPayload) => {
+    setEditingDiscountId(discount.id);
+    setAddingDiscount(true);
+    discountForm.reset({
+      name: discount.name,
+      type: discount.type as 'early_bird' | 'group',
+      discountPercent: discount.discountPercent,
+      isActive: discount.isActive,
+      validTo: discount.validTo ? discount.validTo.split('T')[0] : '',
+      minQuantity: discount.minQuantity ?? undefined,
+    });
+  };
+
+  const onUpdateDiscount = discountForm.handleSubmit(async (data) => {
+    if (!eventId || !editingDiscountId) return;
+    setError(null);
+    setSaving(true);
+    try {
+      const body: UpdateEventDiscountBody = {
+        name: data.name,
+        type: data.type as 'early_bird' | 'group',
+        discountPercent: data.discountPercent,
+        isActive: data.isActive,
+        validTo: data.validTo || undefined,
+        minQuantity: data.minQuantity,
+      };
+      const updated = await updateEventDiscount(eventId, editingDiscountId, body);
+      setDiscounts((prev) => prev.map((d) => (d.id === editingDiscountId ? updated : d)));
+      discountForm.reset({ name: '', type: 'early_bird', discountPercent: 0, isActive: true, validTo: '', minQuantity: undefined });
+      setAddingDiscount(false);
+      setEditingDiscountId(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to update discount');
+    } finally {
+      setSaving(false);
+    }
+  });
 
   const handleUploadImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!eventId || !e.target.files?.[0]) return;
@@ -526,17 +566,19 @@ export default function EditEventPage() {
                       <button type="button" onClick={async () => { if (!eventId) return; setError(null); try { const updated = await updateEventDiscount(eventId, d.id, { isActive: !d.isActive }); setDiscounts((prev) => prev.map((x) => x.id === d.id ? updated : x)); } catch (e) { setError(e instanceof Error ? e.message : 'Failed to update'); } }} className="text-sm text-primary hover:underline">
                         {d.isActive ? 'Deactivate' : 'Activate'}
                       </button>
+                      <button type="button" onClick={() => handleEditDiscount(d)} className="text-sm text-primary hover:underline">Edit</button>
                       <button type="button" onClick={() => onRemoveDiscount(d.id)} className="text-sm text-destructive hover:underline">Remove</button>
                     </div>
                   </li>
                 ))}
               </ul>
               {!addingDiscount ? (
-                <button type="button" onClick={() => setAddingDiscount(true)} className="mt-4 rounded-lg border border-dashed border-border px-4 py-3 text-sm font-medium text-muted-foreground hover:bg-muted/50">
+                <button type="button" onClick={() => { setEditingDiscountId(null); setAddingDiscount(true); }} className="mt-4 rounded-lg border border-dashed border-border px-4 py-3 text-sm font-medium text-muted-foreground hover:bg-muted/50">
                   + Add discount
                 </button>
               ) : (
-                <form onSubmit={onAddDiscount} className="mt-4 space-y-4 rounded-lg border border-border bg-muted/20 p-4">
+                <form onSubmit={editingDiscountId ? onUpdateDiscount : onAddDiscount} className="mt-4 space-y-4 rounded-lg border border-border bg-muted/20 p-4">
+                  <h3 className="font-medium text-foreground">{editingDiscountId ? 'Edit discount' : 'Add discount'}</h3>
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div>
                       <label className="mb-1 block text-sm font-medium text-foreground">Name *</label>
@@ -571,8 +613,10 @@ export default function EditEventPage() {
                     </div>
                   )}
                   <div className="flex gap-2">
-                    <button type="submit" disabled={saving} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50">Add</button>
-                    <button type="button" onClick={() => { setAddingDiscount(false); discountForm.reset(); }} className="rounded-lg border border-border px-4 py-2 text-sm hover:bg-muted/50">Cancel</button>
+                    <button type="submit" disabled={saving} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+                      {saving ? (editingDiscountId ? 'Saving…' : 'Adding…') : (editingDiscountId ? 'Save' : 'Add')}
+                    </button>
+                    <button type="button" onClick={() => { setAddingDiscount(false); setEditingDiscountId(null); discountForm.reset(); }} className="rounded-lg border border-border px-4 py-2 text-sm hover:bg-muted/50">Cancel</button>
                   </div>
                 </form>
               )}

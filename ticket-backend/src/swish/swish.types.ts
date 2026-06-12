@@ -11,8 +11,9 @@ export interface SwishCreatePaymentRequest {
   payerAlias?: string;
   payeeAlias: string;
   amount: string;
-  currency: 'SEK';
+  currency: string;
   message?: string;
+  callbackIdentifier?: string;
 }
 
 export interface SwishCreatePaymentResult {
@@ -23,16 +24,16 @@ export interface SwishCreatePaymentResult {
 
 export interface SwishPaymentResponse {
   id: string;
-  payeePaymentReference: string;
+  payeePaymentReference?: string;
   paymentReference?: string;
-  callbackUrl: string;
+  callbackUrl?: string;
   payerAlias?: string;
-  payeeAlias: string;
-  amount: number;
-  currency: 'SEK';
+  payeeAlias?: string;
+  amount?: number;
+  currency?: string;
   message?: string;
   status: SwishPaymentStatus;
-  dateCreated: string;
+  dateCreated?: string;
   datePaid?: string;
   errorCode?: string;
   errorMessage?: string;

@@ -29,9 +29,11 @@ import {
 import {
   getEventDiscounts,
   createEventDiscount,
+  updateEventDiscount,
   deleteEventDiscount,
   type EventDiscountPayload,
   type CreateEventDiscountBody,
+  type UpdateEventDiscountBody,
 } from '@/lib/event-discounts-api';
 import {
   getEventMedia,
@@ -90,6 +92,7 @@ export default function NewEventPage() {
   const [error, setError] = React.useState<string | null>(null);
   const [addingTicket, setAddingTicket] = React.useState(false);
   const [addingDiscount, setAddingDiscount] = React.useState(false);
+  const [editingDiscountId, setEditingDiscountId] = React.useState<string | null>(null);
   const [addingVideo, setAddingVideo] = React.useState(false);
   const [videoUrl, setVideoUrl] = React.useState('');
   const [uploadingMedia, setUploadingMedia] = React.useState(false);
@@ -250,6 +253,42 @@ export default function NewEventPage() {
     }
   };
 
+  const handleEditDiscount = (discount: EventDiscountPayload) => {
+    setEditingDiscountId(discount.id);
+    setAddingDiscount(true);
+    discountForm.reset({
+      name: discount.name,
+      type: discount.type as 'early_bird' | 'group',
+      discountPercent: discount.discountPercent,
+      validTo: discount.validTo ? discount.validTo.split('T')[0] : '',
+      minQuantity: discount.minQuantity ?? undefined,
+    });
+  };
+
+  const onUpdateDiscount = discountForm.handleSubmit(async (data) => {
+    if (!eventId || !editingDiscountId) return;
+    setError(null);
+    setLoading(true);
+    try {
+      const body: UpdateEventDiscountBody = {
+        name: data.name,
+        type: data.type as 'early_bird' | 'group',
+        discountPercent: data.discountPercent,
+        validTo: data.validTo || undefined,
+        minQuantity: data.minQuantity,
+      };
+      const updated = await updateEventDiscount(eventId, editingDiscountId, body);
+      setDiscounts((prev) => prev.map((d) => (d.id === editingDiscountId ? updated : d)));
+      discountForm.reset({ name: '', type: 'early_bird', discountPercent: 0, validTo: '', minQuantity: undefined });
+      setAddingDiscount(false);
+      setEditingDiscountId(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to update discount');
+    } finally {
+      setLoading(false);
+    }
+  });
+
   const handleUploadImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!eventId || !e.target.files?.[0]) return;
     setError(null);
@@ -346,7 +385,7 @@ export default function NewEventPage() {
           Create event
         </h1>
         <p className="mt-1 text-muted-foreground">
-          Step {step} of 3: {step === 1 ? 'Event details' : step === 2 ? 'Ticket types' : 'Review'}
+          Step {step} of 3: {step === 1 ? 'Event details11' : step === 2 ? 'Ticket types' : 'Review'}
         </p>
 
         {/* Step indicator */}
@@ -618,16 +657,20 @@ export default function NewEventPage() {
                         {d.type === 'group' && d.minQuantity != null && ` · ${d.minQuantity}+ tickets`}
                       </span>
                     </div>
-                    <button type="button" onClick={() => handleRemoveDiscount(d.id)} className="text-sm text-destructive hover:underline">Remove</button>
+                    <div className="flex items-center gap-3">
+                      <button type="button" onClick={() => handleEditDiscount(d)} className="text-sm text-primary hover:underline">Edit</button>
+                      <button type="button" onClick={() => handleRemoveDiscount(d.id)} className="text-sm text-destructive hover:underline">Remove</button>
+                    </div>
                   </li>
                 ))}
               </ul>
               {!addingDiscount ? (
-                <button type="button" onClick={() => setAddingDiscount(true)} className="mt-4 rounded-lg border border-dashed border-border px-4 py-3 text-sm font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground">
+                <button type="button" onClick={() => { setEditingDiscountId(null); setAddingDiscount(true); }} className="mt-4 rounded-lg border border-dashed border-border px-4 py-3 text-sm font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground">
                   + Add discount
                 </button>
               ) : (
-                <form onSubmit={onAddDiscount} className="mt-4 space-y-4 rounded-lg border border-border bg-muted/20 p-4">
+                <form onSubmit={editingDiscountId ? onUpdateDiscount : onAddDiscount} className="mt-4 space-y-4 rounded-lg border border-border bg-muted/20 p-4">
+                  <h3 className="font-medium text-foreground">{editingDiscountId ? 'Edit discount' : 'Add discount'}</h3>
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div>
                       <label className="mb-1 block text-sm font-medium text-foreground">Name *</label>
@@ -660,8 +703,10 @@ export default function NewEventPage() {
                     </div>
                   )}
                   <div className="flex gap-2">
-                    <button type="submit" disabled={loading} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50">{loading ? 'Adding…' : 'Add'}</button>
-                    <button type="button" onClick={() => { setAddingDiscount(false); discountForm.reset(); }} className="rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-muted/50">Cancel</button>
+                    <button type="submit" disabled={loading} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+                      {loading ? (editingDiscountId ? 'Saving…' : 'Adding…') : (editingDiscountId ? 'Save' : 'Add')}
+                    </button>
+                    <button type="button" onClick={() => { setAddingDiscount(false); setEditingDiscountId(null); discountForm.reset(); }} className="rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-muted/50">Cancel</button>
                   </div>
                 </form>
               )}

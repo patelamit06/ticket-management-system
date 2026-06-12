@@ -15,10 +15,7 @@ export const DEFAULT_COUNTRY_CODE = 'US';
 /** Fallback when browse API is unavailable. */
 export const FALLBACK_BROWSE_COUNTRIES: BrowseCountry[] = [
   { code: 'US', label: 'United States' },
-  { code: 'GB', label: 'United Kingdom' },
-  { code: 'IN', label: 'India' },
-  { code: 'AU', label: 'Australia' },
-  { code: 'CA', label: 'Canada' },
+ 
 ];
 
 /** Fetch countries for browse/locale (ISO codes) from backend. */
