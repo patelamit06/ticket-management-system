@@ -1,0 +1,14 @@
+node_modules
+dist
+generated
+coverage
+.git
+.github
+*.log
+.env
+.env.*
+test
+README.md
+prisma/README-DB.md
+.vscode
+.idea
