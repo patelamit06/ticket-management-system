@@ -6,7 +6,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { MinioService } from '../minio/minio.service';
+import { S3Service } from '../s3/s3.service';
 import { CreateEventMediaDto } from './dto/create-event-media.dto';
 
 export interface EventMediaPayload {
@@ -18,12 +18,6 @@ export interface EventMediaPayload {
   sortOrder: number;
   createdAt: Date;
   updatedAt: Date;
-}
-
-/** Use localhost in image URLs so browser (localhost:3000) and resource match; avoids provisional headers / CORS issues. */
-function urlForBrowser(url: string): string {
-  if (typeof url !== 'string') return url;
-  return url.replace(/^http:\/\/127\.0\.0\.1:9000\//, 'http://localhost:9000/');
 }
 
 function toPayload(row: {
@@ -40,7 +34,7 @@ function toPayload(row: {
     id: row.id,
     eventId: row.eventId,
     type: row.type,
-    url: urlForBrowser(row.url),
+    url: row.url,
     caption: row.caption,
     sortOrder: row.sortOrder,
     createdAt: row.createdAt,
@@ -62,7 +56,7 @@ function normalizeVideoUrl(url: string): string {
 export class EventMediaService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly minio: MinioService,
+    private readonly s3: S3Service,
   ) {}
 
   private async assertEventAccess(eventId: string, userId: string, isSuperAdmin: boolean): Promise<void> {
@@ -74,7 +68,7 @@ export class EventMediaService {
   }
 
   /**
-   * Get a presigned PUT URL for direct upload to MinIO. Client uploads the file to uploadUrl,
+   * Get a presigned PUT URL for direct upload to S3. Client uploads the file to uploadUrl,
    * then calls create with type 'image' and this objectKey.
    */
   async getPresignedUpload(
@@ -84,8 +78,8 @@ export class EventMediaService {
     contentType: string,
   ): Promise<{ uploadUrl: string; objectKey: string; publicUrl: string }> {
     await this.assertEventAccess(eventId, userId, isSuperAdmin);
-    if (!this.minio.isAvailable()) {
-      throw new BadRequestException('File upload is not configured (MinIO). Set MINIO_ENDPOINT, MINIO_ACCESS_KEY, MINIO_SECRET_KEY in .env');
+    if (!this.s3.isAvailable()) {
+      throw new BadRequestException('File upload is not configured (S3). Set AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, S3_BUCKET in .env');
     }
     const normalized = contentType === 'image/jpg' ? 'image/jpeg' : contentType;
     const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
@@ -95,19 +89,19 @@ export class EventMediaService {
     const ext = normalized === 'image/jpeg' ? 'jpg' : normalized.split('/')[1] ?? 'jpg';
     const objectKey = `${eventId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
     try {
-      const uploadUrl = await this.minio.getPresignedPutUrl(objectKey);
-      const publicUrl = this.minio.getPublicUrl(objectKey);
+      const uploadUrl = await this.s3.getPresignedPutUrl(objectKey);
+      const publicUrl = this.s3.getPublicUrl(objectKey);
       return { uploadUrl, objectKey, publicUrl };
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'MinIO error';
+      const message = err instanceof Error ? err.message : 'S3 error';
       throw new ServiceUnavailableException(
-        `Storage unavailable: ${message}. Ensure MinIO is running (docker-compose up -d) and reachable at MINIO_ENDPOINT:MINIO_PORT.`,
+        `Storage unavailable: ${message}. Check the S3 bucket, region, and IAM credentials (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / S3_BUCKET / S3_REGION).`,
       );
     }
   }
 
   /**
-   * Create EventMedia record for an image after client has uploaded to MinIO via presigned URL.
+   * Create EventMedia record for an image after client has uploaded to S3 via presigned URL.
    * Validates that objectKey is under this event.
    */
   async confirmImageUpload(
@@ -121,7 +115,7 @@ export class EventMediaService {
     if (!objectKey.startsWith(`${eventId}/`)) {
       throw new BadRequestException('Invalid object key for this event');
     }
-    const url = this.minio.getPublicUrl(objectKey);
+    const url = this.s3.getPublicUrl(objectKey);
     const count = await this.prisma.eventMedia.count({ where: { eventId } });
     const created = await this.prisma.eventMedia.create({
       data: {

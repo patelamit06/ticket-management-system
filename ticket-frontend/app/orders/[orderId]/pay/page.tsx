@@ -94,6 +94,22 @@ function PaymentForm({
   );
 }
 
+/**
+ * Normalise a Swedish phone number to Swish's expected format: digits only with
+ * country code and no leading "+" (e.g. "070-123 45 67" -> "46701234567").
+ * Returns null if it doesn't look like a phone number.
+ */
+function normalizeSwishPhone(input: string): string | null {
+  let digits = input.replace(/[^\d+]/g, '');
+  if (digits.startsWith('+')) digits = digits.slice(1);
+  else if (digits.startsWith('00')) digits = digits.slice(2);
+  digits = digits.replace(/\D/g, '');
+  if (!digits) return null;
+  if (digits.startsWith('0')) digits = `46${digits.slice(1)}`;
+  else if (!digits.startsWith('46')) digits = `46${digits}`;
+  return /^\d{8,15}$/.test(digits) ? digits : null;
+}
+
 function SwishPanel({
   orderId,
   order,
@@ -103,6 +119,8 @@ function SwishPanel({
 }) {
   const router = useRouter();
   const [request, setRequest] = React.useState<SwishCreateResult | null>(null);
+  const [phone, setPhone] = React.useState('');
+  const [usedPhone, setUsedPhone] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
   const [polling, setPolling] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -138,10 +156,22 @@ function SwishPanel({
 
   const handleStart = async () => {
     setError(null);
+
+    let payerAlias: string | undefined;
+    if (phone.trim()) {
+      const normalized = normalizeSwishPhone(phone);
+      if (!normalized) {
+        setError('Enter a valid mobile number, e.g. 070-123 45 67.');
+        return;
+      }
+      payerAlias = normalized;
+    }
+
     setSubmitting(true);
     try {
-      const result = await createSwishPayment(orderId);
+      const result = await createSwishPayment(orderId, payerAlias ? { payerAlias } : {});
       setRequest(result);
+      setUsedPhone(!!payerAlias);
       setStatus(result.status);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create Swish payment');
@@ -162,9 +192,24 @@ function SwishPanel({
     return (
       <div className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          Pay {order.totalAmount.toFixed(2)} SEK with Swish. You&apos;ll scan a QR code with the
-          Swish app, or open it directly on this phone.
+          Pay {order.totalAmount.toFixed(2)} SEK with Swish. Enter your mobile number to get the
+          request pushed straight to your Swish app, or leave it blank to pay by scanning a QR code.
         </p>
+        <div className="space-y-1.5">
+          <label htmlFor="swish-phone" className="text-sm font-medium text-foreground">
+            Mobile number <span className="font-normal text-muted-foreground">(optional)</span>
+          </label>
+          <input
+            id="swish-phone"
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="070-123 45 67"
+            className="w-full rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground shadow-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+          />
+        </div>
         {error && (
           <p className="rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
             {error}
@@ -176,7 +221,11 @@ function SwishPanel({
           disabled={submitting}
           className="w-full rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
         >
-          {submitting ? 'Starting…' : 'Pay with Swish'}
+          {submitting
+            ? 'Starting…'
+            : phone.trim()
+              ? 'Send request to my phone'
+              : 'Pay with Swish'}
         </button>
       </div>
     );
@@ -187,6 +236,25 @@ function SwishPanel({
         `${typeof window !== 'undefined' ? window.location.origin : ''}/orders/${orderId}/success`,
       )}`
     : null;
+
+  if (usedPhone) {
+    return (
+      <div className="space-y-4">
+        <p className="text-sm text-muted-foreground">
+          We&apos;ve sent a payment request to your Swish app. Open Swish on your phone and approve
+          the payment of {order.totalAmount.toFixed(2)} SEK.
+        </p>
+        <p className="text-center text-sm text-muted-foreground">
+          Waiting for payment… status: <span className="font-mono">{status ?? 'CREATED'}</span>
+        </p>
+        {error && (
+          <p className="rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
+            {error}
+          </p>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

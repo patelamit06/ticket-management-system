@@ -2,8 +2,13 @@ node_modules
 dist
 .env
 .env.local
+.env.production
+.env.*.local
 *.log
 coverage
 .generated
 # Prisma 7 generates client here; run `npm run prisma:generate` after clone
 generated
+
+# Swish mTLS certs / any local secrets — never commit
+secrets/

@@ -9,7 +9,7 @@ import { EventsModule } from './events/events.module';
 import { TicketTypesModule } from './ticket-types/ticket-types.module';
 import { EventDiscountsModule } from './event-discounts/event-discounts.module';
 import { EventMediaModule } from './event-media/event-media.module';
-import { MinioModule } from './minio/minio.module';
+import { S3Module } from './s3/s3.module';
 import { StripeModule } from './stripe/stripe.module';
 import { SwishModule } from './swish/swish.module';
 import { OrdersModule } from './orders/orders.module';
@@ -32,7 +32,7 @@ import { CountriesModule } from './countries/countries.module';
     TicketTypesModule,
     EventDiscountsModule,
     EventMediaModule,
-    MinioModule,
+    S3Module,
     StripeModule,
     SwishModule,
     OrdersModule,

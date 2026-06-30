@@ -1,0 +1,58 @@
+# Production compose for the ticket backend on a single EC2 box.
+# - Postgres runs as a container with a named volume (data survives restarts).
+# - Object storage is AWS S3 (managed) — no storage container here. The app talks
+#   to S3 directly via the AWS SDK using the AWS_*/S3_* env vars in .env (see the guide).
+# - The API image is pulled from GHCR (built/pushed by the GitHub Actions workflow).
+# - Nginx runs on the HOST (not here) and reverse-proxies to the port bound on
+#   127.0.0.1 below, so nothing except 22/80/443 is exposed publicly.
+#
+# Usage on EC2:
+#   docker compose -f docker-compose.prod.yml up -d
+#
+# The IMAGE_TAG / GHCR_IMAGE values are injected by the deploy workflow via .env.
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: ticket-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ticket_db}
+      POSTGRES_USER: ${POSTGRES_USER:-ticketadmin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # Bind to loopback only — never expose 5432 to the internet.
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ticketadmin} -d ${POSTGRES_DB:-ticket_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    image: ${GHCR_IMAGE}:${IMAGE_TAG:-latest}
+    container_name: ticket-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # API reachable by nginx on the host loopback only.
+    ports:
+      - "127.0.0.1:3001:3001"
+    volumes:
+      # Swish mTLS certs live on the host and are mounted read-only.
+      # SWISH_*_PATH in .env must point at /app/secrets/swish/...
+      - ./secrets/swish:/app/secrets/swish:ro
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3001/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+volumes:
+  pgdata:
