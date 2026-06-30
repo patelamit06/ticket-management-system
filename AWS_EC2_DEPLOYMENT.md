@@ -414,14 +414,12 @@ These are consumed by [.github/workflows/deploy-aws-prod.yml](.github/workflows/
 
 ---
 
-## Step 13 — First Deploy & GHCR Visibility
+## Step 13 — First Deploy
 
 1. Push to `main` (or **Actions → Deploy Backend to AWS EC2 PROD → Run workflow**). The build job pushes the image to `ghcr.io/<owner>/ticket-backend`.
-2. After the first push, the package is **private** by default — EC2 can't pull it. Make it public:
-   - `github.com/<your-user-or-org>` → **Packages** → `ticket-backend`
-   - **Package settings → Change visibility → Public**
+2. The package stays **private** (the default). The EC2 box authenticates to GHCR automatically — the `deploy` job has `packages: read` permission and the script runs `docker login ghcr.io` with the workflow's built-in `GITHUB_TOKEN` before pulling. No manual visibility change and no long-lived PAT needed.
 
-> Prefer private images? Add a `docker login ghcr.io` step in the `deploy` job's script using a GHCR Personal Access Token (`read:packages`) stored as a `GHCR_TOKEN` secret. Public is simpler for a single project.
+> If you ever run the deploy from a context without `GITHUB_TOKEN` package access (e.g. a fork), either make the package public (`github.com/<owner>` → **Packages** → `ticket-backend` → **Package settings → Change visibility → Public**) or supply a GHCR PAT (`read:packages`) as a secret and log in with that instead.
 
 The deploy job then:
 1. Copies `docker-compose.prod.yml` + `nginx/nginx.conf` to `/opt/ticket`
