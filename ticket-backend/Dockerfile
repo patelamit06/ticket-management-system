@@ -57,4 +57,6 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=5 \
   CMD curl -fsS http://127.0.0.1:3001/health || exit 1
 
 ENTRYPOINT ["docker-entrypoint.sh"]
-CMD ["node", "dist/main"]
+# nest build roots output at the common ancestor of src/ and the imported
+# generated/ Prisma client, so the entry compiles to dist/src/main.js.
+CMD ["node", "dist/src/main"]
