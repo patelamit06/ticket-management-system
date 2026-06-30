@@ -6,6 +6,12 @@ dist
 .env.*.local
 *.log
 coverage
+
+# Stray TS build artifacts (prisma/ gets pulled into nest build's rootDir)
+*.tsbuildinfo
+prisma/seed.js
+prisma/seed.js.map
+prisma/seed.d.ts
 .generated
 # Prisma 7 generates client here; run `npm run prisma:generate` after clone
 generated
