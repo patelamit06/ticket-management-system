@@ -15,7 +15,11 @@ async function bootstrap() {
     }),
   );
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
-  app.enableCors({ origin: process.env.FRONTEND_URL ?? 'http://localhost:3000', credentials: true });
+  const allowedOrigins = (process.env.FRONTEND_URL ?? 'http://localhost:3000')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+  app.enableCors({ origin: allowedOrigins, credentials: true });
 
   const config = new DocumentBuilder()
     .setTitle('Event Ticketing API')
