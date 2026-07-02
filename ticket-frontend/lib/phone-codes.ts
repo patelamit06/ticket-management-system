@@ -3,7 +3,7 @@
  */
 export const FALLBACK_COUNTRIES: { code: string; label: string }[] = [
   { code: '+1', label: 'US/Canada +1' },
-  { code: '+91', label: 'India +91' },
+  { code: '+46', label: 'Sweden +46' },
   { code: '+44', label: 'UK +44' },
 ];
 

@@ -41,17 +41,27 @@ import {
   type EventMediaPayload,
 } from '@/lib/event-media-api';
 
-const eventDetailsSchema = z.object({
-  name: z.string().min(1, 'Event name is required').max(300),
-  description: z.string().max(5000).optional(),
-  location: z.string().max(500).optional(),
-  startDate: z.string().min(1, 'Start date is required'),
-  endDate: z.string().min(1, 'End date is required'),
-  country: z.string().optional(),
-  city: z.string().max(200).optional(),
-  timezone: z.string().max(100).optional(),
-  currency: z.enum(SUPPORTED_CURRENCIES),
-});
+const eventDetailsSchema = z
+  .object({
+    name: z.string().min(1, 'Event name is required').max(300),
+    description: z.string().max(5000).optional(),
+    location: z.string().max(500).optional(),
+    startDate: z.string().min(1, 'Start date is required'),
+    endDate: z.string().min(1, 'End date is required'),
+    country: z.string().optional(),
+    city: z.string().max(200).optional(),
+    timezone: z.string().max(100).optional(),
+    currency: z.enum(SUPPORTED_CURRENCIES),
+  })
+  // Allow a small grace (1 min) so submitting right on "now" doesn't fail.
+  .refine((d) => new Date(d.startDate).getTime() >= Date.now() - 60_000, {
+    message: 'Start date cannot be in the past',
+    path: ['startDate'],
+  })
+  .refine((d) => new Date(d.endDate).getTime() >= new Date(d.startDate).getTime(), {
+    message: 'End date must be after the start date',
+    path: ['endDate'],
+  });
 
 type EventDetailsForm = z.infer<typeof eventDetailsSchema>;
 
@@ -94,6 +104,13 @@ export default function NewEventPage() {
   const [videoUrl, setVideoUrl] = React.useState('');
   const [uploadingMedia, setUploadingMedia] = React.useState(false);
   const [imgLoadErrors, setImgLoadErrors] = React.useState<Set<string>>(new Set());
+
+  // Local "now" as a datetime-local value (YYYY-MM-DDTHH:mm) to prevent picking a past date.
+  const minDateTime = React.useMemo(() => {
+    const d = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }, []);
 
   const eventForm = useForm<EventDetailsForm>({
     resolver: zodResolver(eventDetailsSchema),
@@ -418,6 +435,7 @@ export default function NewEventPage() {
                   <input
                     id="startDate"
                     type="datetime-local"
+                    min={minDateTime}
                     className={inputClass}
                     {...eventForm.register('startDate')}
                   />
@@ -434,6 +452,7 @@ export default function NewEventPage() {
                   <input
                     id="endDate"
                     type="datetime-local"
+                    min={minDateTime}
                     className={inputClass}
                     {...eventForm.register('endDate')}
                   />
@@ -489,7 +508,7 @@ export default function NewEventPage() {
                   ))}
                 </select>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Ticket prices and orders use this currency. Pick SEK to accept Swish.
+                  Ticket prices and orders use this currency.
                 </p>
               </div>
             </section>
@@ -674,7 +693,7 @@ export default function NewEventPage() {
               </p>
               {media.some((m) => m.type === 'image') && media.some((m) => m.type === 'image' && imgLoadErrors.has(m.id)) && (
                 <p className="mt-2 text-xs text-amber-600 dark:text-amber-500">
-                  Some thumbnails could not load. If images are missing, set the MinIO bucket &quot;events&quot; to public read (Console → http://localhost:9001).
+                  Some thumbnails could not load. If images are missing, make sure the S3 bucket allows public read on objects and has CORS configured.
                 </p>
               )}
               <ul className="mt-4 space-y-3">

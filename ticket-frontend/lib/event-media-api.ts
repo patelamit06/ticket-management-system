@@ -19,7 +19,7 @@ export interface CreateEventMediaVideoBody {
   caption?: string;
 }
 
-/** Get presigned PUT URL, upload file to MinIO, then create media record. No file goes through our API. */
+/** Get presigned PUT URL, upload file to S3, then create media record. No file goes through our API. */
 export async function uploadEventMedia(
   eventId: string,
   file: File,
