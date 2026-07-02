@@ -23,6 +23,13 @@ const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
 
 type Method = 'card' | 'swish';
 
+/**
+ * Swish is temporarily hidden from the checkout UI — only Stripe (card) is
+ * offered. The Swish code below is intentionally kept intact; flip this to
+ * `true` to bring the Swish payment option back.
+ */
+const SWISH_ENABLED = false;
+
 function PaymentForm({
   orderId,
   order,
@@ -450,30 +457,32 @@ export default function PayPage() {
             : `$${order!.totalAmount.toFixed(2)}`}
         </p>
 
-        <div className="mt-6 inline-flex rounded-xl border border-border bg-card p-1">
-          <button
-            type="button"
-            onClick={() => setMethod('card')}
-            className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
-              method === 'card'
-                ? 'bg-primary text-primary-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            Card
-          </button>
-          <button
-            type="button"
-            onClick={() => setMethod('swish')}
-            className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
-              method === 'swish'
-                ? 'bg-primary text-primary-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            Swish
-          </button>
-        </div>
+        {SWISH_ENABLED && (
+          <div className="mt-6 inline-flex rounded-xl border border-border bg-card p-1">
+            <button
+              type="button"
+              onClick={() => setMethod('card')}
+              className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
+                method === 'card'
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Card
+            </button>
+            <button
+              type="button"
+              onClick={() => setMethod('swish')}
+              className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
+                method === 'swish'
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Swish
+            </button>
+          </div>
+        )}
 
         {method === 'card' && clientSecret && order && (
           <div className="mt-8 rounded-xl border border-border bg-card p-6">
@@ -492,7 +501,7 @@ export default function PayPage() {
           </div>
         )}
 
-        {method === 'swish' && order && (
+        {SWISH_ENABLED && method === 'swish' && order && (
           <div className="mt-8 rounded-xl border border-border bg-card p-6">
             <SwishPanel orderId={orderId} order={order} />
           </div>

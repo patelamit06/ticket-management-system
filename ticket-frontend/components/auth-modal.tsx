@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -163,9 +164,18 @@ export function AuthModal() {
                 )}
               </div>
               <div>
-                <label htmlFor="auth-modal-password" className="mb-1 block text-sm font-medium text-foreground">
-                  Password
-                </label>
+                <div className="mb-1 flex items-center justify-between">
+                  <label htmlFor="auth-modal-password" className="block text-sm font-medium text-foreground">
+                    Password
+                  </label>
+                  <Link
+                    href="/forgot-password"
+                    onClick={close}
+                    className="text-sm font-medium text-primary hover:underline"
+                  >
+                    Forgot password?
+                  </Link>
+                </div>
                 <PasswordInput
                   id="auth-modal-password"
                   autoComplete="current-password"

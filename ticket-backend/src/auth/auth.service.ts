@@ -1,13 +1,19 @@
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
+import { randomBytes, createHash } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import { MailService } from '../mail/mail.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 
 const DEFAULT_ROLE = 'attendee';
 const SALT_ROUNDS = 10;
+const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
+// Generic message returned regardless of whether the email exists (avoids account enumeration).
+const RESET_REQUEST_MESSAGE =
+  'If an account exists for that email, we have sent password reset instructions.';
 
 export interface JwtPayload {
   sub: string;
@@ -26,6 +32,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
+    private readonly mail: MailService,
   ) {}
 
   async register(dto: RegisterDto): Promise<AuthResponse> {
@@ -59,6 +66,56 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password');
     }
     return this.buildAuthResponse(user);
+  }
+
+  /**
+   * Start a password reset: generate a one-time token, store its hash + expiry on the user,
+   * and email the reset link. Always returns the same generic message so callers can't probe
+   * which emails are registered.
+   */
+  async forgotPassword(email: string): Promise<{ message: string }> {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (user) {
+      const token = randomBytes(32).toString('hex');
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          passwordResetTokenHash: this.hashToken(token),
+          passwordResetExpiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS),
+        },
+      });
+      const frontendUrl = this.config.get<string>('FRONTEND_URL', 'http://localhost:3000');
+      const resetUrl = `${frontendUrl.split(',')[0].trim()}/reset-password?token=${token}`;
+      await this.mail.sendPasswordReset(user.email, resetUrl);
+    }
+    return { message: RESET_REQUEST_MESSAGE };
+  }
+
+  /** Complete a password reset given a valid, unexpired token. */
+  async resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
+    const user = await this.prisma.user.findFirst({
+      where: {
+        passwordResetTokenHash: this.hashToken(token),
+        passwordResetExpiresAt: { gt: new Date() },
+      },
+    });
+    if (!user) {
+      throw new BadRequestException('This reset link is invalid or has expired.');
+    }
+    const passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash,
+        passwordResetTokenHash: null,
+        passwordResetExpiresAt: null,
+      },
+    });
+    return { message: 'Your password has been reset. You can now log in.' };
+  }
+
+  private hashToken(token: string): string {
+    return createHash('sha256').update(token).digest('hex');
   }
 
   async validateUserById(id: string) {

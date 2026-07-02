@@ -585,7 +585,7 @@ export default function EditEventPage() {
               </p>
               {media.some((m) => m.type === 'image') && media.some((m) => m.type === 'image' && imgLoadErrors.has(m.id)) && (
                 <p className="mt-2 text-xs text-amber-600 dark:text-amber-500">
-                  Some thumbnails could not load. If images are missing, set the MinIO bucket &quot;events&quot; to public read (Console → http://localhost:9001).
+                  Some thumbnails could not load. If images are missing, make sure the S3 bucket allows public read on objects and has CORS configured.
                 </p>
               )}
               <ul className="mt-4 space-y-3">

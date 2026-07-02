@@ -21,6 +21,8 @@ model User {
   role                   String   // super_admin | organizer | coordinator | attendee
   country                String?
   stripeConnectAccountId String?  @map("stripe_connect_account_id") // For payouts (Stripe Connect)
+  passwordResetTokenHash String?  @map("password_reset_token_hash") // sha256 of the reset token; null when no active request
+  passwordResetExpiresAt DateTime? @map("password_reset_expires_at")
   createdAt              DateTime @default(now()) @map("created_at")
   updatedAt              DateTime @updatedAt @map("updated_at")
 

@@ -9,8 +9,6 @@ const adapter = new PrismaPg({ connectionString: url }, schema ? { schema } : un
 const prisma = new PrismaClient({ adapter });
 
 const countries: { dialCode: string; name: string; isoCode: string | null; sortOrder: number }[] = [
-
-  { dialCode: '+91', name: 'India', isoCode: 'IN', sortOrder: 14 },
   { dialCode: '+46', name: 'Sweden', isoCode: 'SE', sortOrder: 28 },
   { dialCode: '+44', name: 'UK', isoCode: 'GB', sortOrder: 31 },
   { dialCode: '+1', name: 'US/Canada', isoCode: 'US', sortOrder: 32 },
@@ -20,11 +18,18 @@ async function main() {
   for (const c of countries) {
     await prisma.country.upsert({
       where: { dialCode: c.dialCode },
-      create: { dialCode: c.dialCode, name: c.name, isoCode: c.isoCode, sortOrder: c.sortOrder },
-      update: { name: c.name, isoCode: c.isoCode, sortOrder: c.sortOrder },
+      create: { dialCode: c.dialCode, name: c.name, isoCode: c.isoCode, sortOrder: c.sortOrder, isActive: true },
+      update: { name: c.name, isoCode: c.isoCode, sortOrder: c.sortOrder, isActive: true },
     });
   }
-  console.log('Seeded', countries.length, 'countries');
+  // Deactivate any country no longer in the seed list (e.g. India) so it drops out of
+  // both the phone-code and browse dropdowns without deleting historical rows.
+  const keep = countries.map((c) => c.dialCode);
+  const { count } = await prisma.country.updateMany({
+    where: { dialCode: { notIn: keep }, isActive: true },
+    data: { isActive: false },
+  });
+  console.log('Seeded', countries.length, 'countries; deactivated', count);
   await prisma.$disconnect();
 }
 
