@@ -49,15 +49,19 @@ export default function CheckInPage() {
   const [manualCode, setManualCode] = React.useState('');
   const [cameraActive, setCameraActive] = React.useState(false);
   const videoRef = React.useRef<HTMLVideoElement>(null);
+  const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
   const streamRef = React.useRef<MediaStream | null>(null);
   const detectorRef = React.useRef<BarcodeDetector | null>(null);
   const rafRef = React.useRef<number | null>(null);
+  const stoppedRef = React.useRef(false);
   const processingRef = React.useRef(false);
 
   const stopCamera = React.useCallback(() => {
+    stoppedRef.current = true;
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
+    if (videoRef.current) videoRef.current.srcObject = null;
     setCameraActive(false);
   }, []);
 
@@ -79,30 +83,63 @@ export default function CheckInPage() {
   }, [stopCamera]);
 
   const startCamera = React.useCallback(async () => {
-    if (!('BarcodeDetector' in window)) {
-      setStatus({ type: 'error', message: 'Camera QR scanning is not supported in this browser. Use manual entry below.' });
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setStatus({ type: 'error', message: 'Camera is not available in this browser. Use manual entry below.' });
       return;
     }
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' } },
+        audio: false,
+      });
+      stoppedRef.current = false;
       streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
+      const video = videoRef.current;
+      if (!video) {
+        stream.getTracks().forEach((t) => t.stop());
+        return;
       }
-      detectorRef.current = new BarcodeDetector({ formats: ['qr_code'] });
+      video.srcObject = stream;
+      await video.play();
       setCameraActive(true);
 
-      const scan = async () => {
-        if (!videoRef.current || !detectorRef.current || processingRef.current) {
+      const hasDetector = 'BarcodeDetector' in window;
+      if (hasDetector) {
+        detectorRef.current = new BarcodeDetector({ formats: ['qr_code'] });
+      }
+      // iOS Safari has no BarcodeDetector — decode frames with jsQR instead.
+      const jsQR = hasDetector ? null : (await import('jsqr')).default;
+      let lastDecode = 0;
+
+      const scan = async (now: number) => {
+        if (stoppedRef.current) return;
+        if (!videoRef.current || processingRef.current || videoRef.current.readyState < 2) {
           rafRef.current = requestAnimationFrame(scan);
           return;
         }
         try {
-          const codes = await detectorRef.current.detect(videoRef.current);
-          if (codes.length > 0) {
-            await handleScan(codes[0].rawValue);
-            return;
+          if (detectorRef.current) {
+            const codes = await detectorRef.current.detect(videoRef.current);
+            if (codes.length > 0) {
+              await handleScan(codes[0].rawValue);
+              return;
+            }
+          } else if (jsQR && now - lastDecode > 200) {
+            lastDecode = now;
+            const v = videoRef.current;
+            const canvas = (canvasRef.current ??= document.createElement('canvas'));
+            canvas.width = v.videoWidth;
+            canvas.height = v.videoHeight;
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
+            if (ctx && canvas.width > 0) {
+              ctx.drawImage(v, 0, 0);
+              const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+              const code = jsQR(img.data, img.width, img.height);
+              if (code?.data) {
+                await handleScan(code.data);
+                return;
+              }
+            }
           }
         } catch {
           //
@@ -110,8 +147,15 @@ export default function CheckInPage() {
         rafRef.current = requestAnimationFrame(scan);
       };
       rafRef.current = requestAnimationFrame(scan);
-    } catch {
-      setStatus({ type: 'error', message: 'Camera access denied or unavailable.' });
+    } catch (e) {
+      const name = e instanceof DOMException ? e.name : '';
+      const message =
+        name === 'NotAllowedError'
+          ? 'Camera permission was denied. Allow camera access in your browser settings and try again.'
+          : name === 'NotFoundError'
+            ? 'No camera was found on this device. Use manual entry below.'
+            : 'Camera access denied or unavailable. Use manual entry below.';
+      setStatus({ type: 'error', message });
     }
   }, [handleScan]);
 
@@ -192,32 +236,35 @@ export default function CheckInPage() {
             {/* Camera scanner */}
             <div className="rounded-xl border border-border bg-card p-5">
               <h2 className="font-semibold text-foreground mb-3">Camera Scanner</h2>
-              {cameraActive ? (
+              {/* The video element stays mounted so the ref exists when the stream attaches. */}
+              <div className={cameraActive ? '' : 'hidden'}>
                 <div className="relative">
                   <video
                     ref={videoRef}
                     className="w-full rounded-lg bg-black"
+                    autoPlay
                     playsInline
                     muted
                     style={{ maxHeight: 320 }}
                   />
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="h-48 w-48 rounded-2xl border-4 border-primary/70" />
+                    <div className="h-48 w-48 max-h-full max-w-full rounded-2xl border-4 border-primary/70" />
                   </div>
-                  <button
-                    type="button"
-                    onClick={stopCamera}
-                    className="mt-3 w-full rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"
-                  >
-                    Stop camera
-                  </button>
-                  {status.type === 'scanning' && (
-                    <p className="mt-2 text-center text-xs text-muted-foreground animate-pulse">
-                      Scanning…
-                    </p>
-                  )}
                 </div>
-              ) : (
+                <button
+                  type="button"
+                  onClick={stopCamera}
+                  className="mt-3 w-full rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"
+                >
+                  Stop camera
+                </button>
+                {status.type === 'scanning' && (
+                  <p className="mt-2 text-center text-xs text-muted-foreground animate-pulse">
+                    Scanning…
+                  </p>
+                )}
+              </div>
+              {!cameraActive && (
                 <button
                   type="button"
                   onClick={startCamera}

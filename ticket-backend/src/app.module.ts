@@ -20,11 +20,13 @@ import { CheckInModule } from './check-in/check-in.module';
 import { AdminModule } from './admin/admin.module';
 import { ReportsModule } from './reports/reports.module';
 import { CountriesModule } from './countries/countries.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
+    NotificationsModule,
     AuthModule,
     CountriesModule,
     UsersModule,

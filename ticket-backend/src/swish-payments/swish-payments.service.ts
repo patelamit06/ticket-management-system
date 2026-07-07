@@ -10,6 +10,7 @@ import { SwishService } from '../swish/swish.service';
 import { SwishPaymentResponse, SwishPaymentStatus } from '../swish/swish.types';
 import { OrdersService } from '../orders/orders.service';
 import { TicketsService } from '../tickets/tickets.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreateSwishPaymentDto } from './dto/create-swish-payment.dto';
 
 export interface CreateSwishPaymentResult {
@@ -29,6 +30,7 @@ export class SwishPaymentsService {
     private readonly swish: SwishService,
     private readonly orders: OrdersService,
     private readonly tickets: TicketsService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async createPayment(orderId: string, dto: CreateSwishPaymentDto): Promise<CreateSwishPaymentResult> {
@@ -154,5 +156,6 @@ export class SwishPaymentsService {
 
     await this.orders.markPaidExternal(orderId, `swish:${remote.id}`);
     await this.tickets.createForOrder(orderId);
+    await this.notifications.sendOrderConfirmation(orderId);
   }
 }
