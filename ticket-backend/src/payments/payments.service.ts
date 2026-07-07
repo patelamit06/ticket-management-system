@@ -3,6 +3,7 @@ import Stripe from 'stripe';
 import { OrdersService } from '../orders/orders.service';
 import { StripeService } from '../stripe/stripe.service';
 import { TicketsService } from '../tickets/tickets.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 const PLATFORM_FEE_PERCENT = 5;
 
@@ -12,6 +13,7 @@ export class PaymentsService {
     private readonly stripeService: StripeService,
     private readonly ordersService: OrdersService,
     private readonly ticketsService: TicketsService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   /**
@@ -184,6 +186,7 @@ export class PaymentsService {
       if (pi.status === 'succeeded') {
         await this.ordersService.markPaid(order.id, pi.id);
         await this.ticketsService.createForOrder(order.id);
+        await this.notifications.sendOrderConfirmation(order.id);
         return { status: 'paid' };
       }
       return { status: pi.status };
@@ -231,5 +234,6 @@ export class PaymentsService {
 
     await this.ordersService.markPaid(order.id, pi.id);
     await this.ticketsService.createForOrder(order.id);
+    await this.notifications.sendOrderConfirmation(order.id);
   }
 }

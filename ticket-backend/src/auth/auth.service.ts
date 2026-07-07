@@ -4,7 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { randomBytes, createHash } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
-import { MailService } from '../mail/mail.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 
@@ -32,7 +32,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
-    private readonly mail: MailService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async register(dto: RegisterDto): Promise<AuthResponse> {
@@ -53,6 +53,9 @@ export class AuthService {
         role,
       },
     });
+    // Fire-and-forget: don't delay or fail registration on the welcome email
+    // (sendWelcome swallows its own errors, so the floating promise is safe).
+    void this.notifications.sendWelcome({ email: user.email, name: user.name });
     return this.buildAuthResponse(user);
   }
 
@@ -86,7 +89,7 @@ export class AuthService {
       });
       const frontendUrl = this.config.get<string>('FRONTEND_URL', 'http://localhost:3000');
       const resetUrl = `${frontendUrl.split(',')[0].trim()}/reset-password?token=${token}`;
-      await this.mail.sendPasswordReset(user.email, resetUrl);
+      await this.notifications.sendPasswordReset(user.email, resetUrl);
     }
     return { message: RESET_REQUEST_MESSAGE };
   }
