@@ -3,42 +3,66 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { CheckCircle2, ScanLine, XCircle } from 'lucide-react';
+import { CheckCircle2, Minus, Plus, ScanLine, Users, XCircle } from 'lucide-react';
 import { SiteHeader } from '@/components/site-header';
 import { SiteFooter } from '@/components/site-footer';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
-interface ScanResult {
+interface CheckedInResult {
+  status: 'checkedIn';
   success: true;
+  checkedIn: number;
   checkedInAt: string;
   attendeeName: string | null;
   attendeeEmail: string | null;
   ticketTypeName: string;
   eventName: string;
+  groupTotal: number;
+  alreadyCheckedIn: number;
+  remaining: number;
 }
 
-async function scanTicket(uniqueCode: string): Promise<ScanResult> {
+interface GroupResult {
+  status: 'group';
+  groupTotal: number;
+  alreadyCheckedIn: number;
+  remaining: number;
+  attendeeName: string | null;
+  attendeeEmail: string | null;
+  ticketTypeName: string;
+  eventName: string;
+  scannedTicketUsedAt: string | null;
+}
+
+type ScanResponse = CheckedInResult | GroupResult;
+
+async function postCheckIn<T>(path: string, body: object): Promise<T> {
   const token = typeof window !== 'undefined' ? localStorage.getItem('ticket_access_token') : null;
-  const res = await fetch(`${API_URL}/check-in/scan`, {
+  const res = await fetch(`${API_URL}${path}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify({ uniqueCode }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ message: res.statusText }));
     throw new Error((err as { message?: string }).message ?? res.statusText);
   }
-  return res.json() as Promise<ScanResult>;
+  return res.json() as Promise<T>;
 }
+
+const scanTicket = (uniqueCode: string) => postCheckIn<ScanResponse>('/check-in/scan', { uniqueCode });
+const confirmGroup = (uniqueCode: string, count: number) =>
+  postCheckIn<CheckedInResult>('/check-in/confirm', { uniqueCode, count });
 
 type Status =
   | { type: 'idle' }
   | { type: 'scanning' }
-  | { type: 'success'; result: ScanResult }
+  | { type: 'group'; uniqueCode: string; info: GroupResult; count: number }
+  | { type: 'success'; result: CheckedInResult }
   | { type: 'error'; message: string };
 
 export default function CheckInPage() {
@@ -72,7 +96,12 @@ export default function CheckInPage() {
     setStatus({ type: 'scanning' });
     try {
       const result = await scanTicket(trimmed);
-      setStatus({ type: 'success', result });
+      if (result.status === 'group') {
+        // Group booking: ask staff how many attendees to admit.
+        setStatus({ type: 'group', uniqueCode: trimmed, info: result, count: result.remaining });
+      } else {
+        setStatus({ type: 'success', result });
+      }
       stopCamera();
     } catch (e) {
       setStatus({ type: 'error', message: e instanceof Error ? e.message : 'Scan failed' });
@@ -81,6 +110,20 @@ export default function CheckInPage() {
       processingRef.current = false;
     }
   }, [stopCamera]);
+
+  const handleConfirmGroup = React.useCallback(async (uniqueCode: string, count: number) => {
+    if (processingRef.current) return;
+    processingRef.current = true;
+    setStatus({ type: 'scanning' });
+    try {
+      const result = await confirmGroup(uniqueCode, count);
+      setStatus({ type: 'success', result });
+    } catch (e) {
+      setStatus({ type: 'error', message: e instanceof Error ? e.message : 'Check-in failed' });
+    } finally {
+      processingRef.current = false;
+    }
+  }, []);
 
   const startCamera = React.useCallback(async () => {
     if (!navigator.mediaDevices?.getUserMedia) {
@@ -200,6 +243,12 @@ export default function CheckInPage() {
                   </p>
                 )}
                 <p className="mt-0.5 text-sm text-green-700">{status.result.ticketTypeName}</p>
+                {status.result.groupTotal > 1 && (
+                  <p className="mt-0.5 text-sm text-green-700">
+                    Checked in {status.result.checkedIn} ticket{status.result.checkedIn > 1 ? 's' : ''} —{' '}
+                    {status.result.remaining} remaining in this group
+                  </p>
+                )}
                 <p className="mt-0.5 text-xs text-green-600">
                   {new Date(status.result.checkedInAt).toLocaleString()}
                 </p>
@@ -212,6 +261,74 @@ export default function CheckInPage() {
             >
               Scan next ticket
             </button>
+          </div>
+        )}
+
+        {status.type === 'group' && (
+          <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-5">
+            <div className="flex items-start gap-3">
+              <Users className="mt-0.5 h-6 w-6 shrink-0 text-amber-600" aria-hidden />
+              <div>
+                <p className="font-semibold text-amber-900">
+                  Group booking — {status.info.ticketTypeName} ×{status.info.groupTotal}
+                </p>
+                {(status.info.attendeeName || status.info.attendeeEmail) && (
+                  <p className="mt-1 text-sm text-amber-800">
+                    {status.info.attendeeName ?? status.info.attendeeEmail}
+                  </p>
+                )}
+                <p className="mt-0.5 text-sm text-amber-800">
+                  {status.info.alreadyCheckedIn} of {status.info.groupTotal} checked in ·{' '}
+                  {status.info.remaining} remaining
+                </p>
+                {status.info.scannedTicketUsedAt && (
+                  <p className="mt-1 text-xs font-medium text-amber-700">
+                    ⚠ This code was already scanned at{' '}
+                    {new Date(status.info.scannedTicketUsedAt).toLocaleString()}
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="mt-4 flex items-center justify-center gap-4">
+              <span className="text-sm font-medium text-amber-900">Check in:</span>
+              <button
+                type="button"
+                onClick={() => setStatus({ ...status, count: Math.max(1, status.count - 1) })}
+                disabled={status.count <= 1}
+                aria-label="Fewer tickets"
+                className="flex h-9 w-9 items-center justify-center rounded-lg border border-amber-300 bg-white text-amber-900 hover:bg-amber-100 disabled:opacity-40"
+              >
+                <Minus className="h-4 w-4" aria-hidden />
+              </button>
+              <span className="w-8 text-center text-lg font-bold text-amber-900">{status.count}</span>
+              <button
+                type="button"
+                onClick={() =>
+                  setStatus({ ...status, count: Math.min(status.info.remaining, status.count + 1) })
+                }
+                disabled={status.count >= status.info.remaining}
+                aria-label="More tickets"
+                className="flex h-9 w-9 items-center justify-center rounded-lg border border-amber-300 bg-white text-amber-900 hover:bg-amber-100 disabled:opacity-40"
+              >
+                <Plus className="h-4 w-4" aria-hidden />
+              </button>
+            </div>
+            <div className="mt-4 flex gap-2">
+              <button
+                type="button"
+                onClick={() => handleConfirmGroup(status.uniqueCode, status.count)}
+                className="flex-1 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+              >
+                Confirm check-in ({status.count})
+              </button>
+              <button
+                type="button"
+                onClick={reset}
+                className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         )}
 
@@ -231,7 +348,7 @@ export default function CheckInPage() {
           </div>
         )}
 
-        {status.type !== 'success' && (
+        {status.type !== 'success' && status.type !== 'group' && (
           <>
             {/* Camera scanner */}
             <div className="rounded-xl border border-border bg-card p-5">
