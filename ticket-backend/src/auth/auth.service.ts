@@ -7,6 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 
 const DEFAULT_ROLE = 'attendee';
 const SALT_ROUNDS = 10;
@@ -126,6 +127,24 @@ export class AuthService {
     if (!user) return null;
     const { passwordHash: _, ...safe } = user;
     return safe;
+  }
+
+  async updateProfile(userId: string, dto: UpdateProfileDto) {
+    const user = await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...(dto.name !== undefined && { name: dto.name }),
+        ...(dto.phone !== undefined && { phone: dto.phone }),
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        phone: true,
+        role: true,
+      },
+    });
+    return user;
   }
 
   private buildAuthResponse(user: { id: string; email: string; name: string | null; phone: string | null; role: string }): AuthResponse {

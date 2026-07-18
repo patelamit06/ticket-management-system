@@ -109,6 +109,24 @@ export async function fetchMe(): Promise<AuthUser | null> {
   return res.json() as Promise<AuthUser>;
 }
 
+export async function updateProfile(data: { name?: string; phone?: string }): Promise<AuthUser> {
+  const token = getToken();
+  if (!token) throw new Error('Not authenticated');
+  const res = await fetch(`${API_URL}/auth/me`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error((err as { message?: string }).message ?? 'Update failed');
+  }
+  return res.json() as Promise<AuthUser>;
+}
+
 export async function apiWithAuth<T>(path: string, options?: RequestInit): Promise<T> {
   const token = getToken();
   const url = path.startsWith('http') ? path : `${API_URL}${path}`;
